@@ -10,6 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Noto+Sans+Tamil:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/base.css">
 <link rel="stylesheet" href="assets/css/site.css">
+<link rel="stylesheet" href="assets/css/agent.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%231f3480'/><text y='68' x='50' text-anchor='middle' font-size='52' font-family='sans-serif' font-weight='bold' fill='%23f5b533'>NG</text></svg>">
 </head>
 <body class="site">
@@ -496,6 +497,7 @@
 <div id="toasts"></div>
 
 <script src="assets/js/core.js"></script>
+<script src="assets/js/agent.js"></script>
 <script>
 /* ---------- Landing page behaviour ---------- */
 const head = document.getElementById('siteHead');
@@ -556,6 +558,40 @@ function doLogin(e) {
   setTimeout(() => location.href = 'app.html', 550);
 }
 paintRoles();
+
+/* ---------- Voice assistant on the public site ---------- */
+Agent.init();
+Agent.screen({
+  screen: 'landing',
+  label: 'School home page',
+  description:
+    'The public home page of New Gen Higher Secondary School. A visitor can read about the school, ' +
+    'jump to a section of the page, or sign in to the management portal. Signing in needs a role: ' +
+    'admin, principal, teacher, accountant, parent or student. If someone asks to open the portal or ' +
+    'log in without naming a role, open the login as admin.',
+  routes: [
+    { id: 'about', label: 'About the school', go: () => document.getElementById('about').scrollIntoView({ behavior: 'smooth' }) },
+    { id: 'academics', label: 'Academics and the standards taught', go: () => document.getElementById('academics').scrollIntoView({ behavior: 'smooth' }) },
+    { id: 'admissions', label: 'Admissions and fee structure', go: () => document.getElementById('admissions').scrollIntoView({ behavior: 'smooth' }) },
+    { id: 'results', label: 'Board results and toppers', go: () => document.getElementById('results').scrollIntoView({ behavior: 'smooth' }) },
+    { id: 'news', label: 'News, circulars and the calendar', go: () => document.getElementById('news').scrollIntoView({ behavior: 'smooth' }) },
+    { id: 'contact', label: 'Contact details and address', go: () => document.getElementById('contact').scrollIntoView({ behavior: 'smooth' }) }
+  ],
+  actions: [
+    { id: 'open_portal', label: 'Open the portal / sign in',
+      arg: 'the role to sign in as: admin, principal, teacher, accountant, parent or student. Defaults to admin.',
+      run: role => {
+        const r = String(role || 'admin').toLowerCase().trim();
+        openLogin(DEMO_USERS[r] ? r : 'admin');
+        return `Opened the login for ${DEMO_USERS[r] ? r : 'admin'}`;
+      } },
+    { id: 'sign_in_now', label: 'Complete the sign-in with the role already selected',
+      run: () => { document.getElementById('loginForm').requestSubmit(); return 'Signing in'; } },
+    { id: 'close_login', label: 'Close the login box', run: () => closeLogin() },
+    { id: 'toggle_theme', label: 'Switch between light and dark theme',
+      run: () => document.getElementById('themeBtn').click() }
+  ]
+});
 </script>
 </body>
 </html>

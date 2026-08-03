@@ -1,8 +1,9 @@
 # New Gen Higher Secondary School — Student Management Portal
 
 A demonstration student-management application for a Tamil Nadu higher secondary
-school, built around one distinguishing idea: **every form can be filled by voice,
-side by side with the keyboard.**
+school, built around one distinguishing idea: **you talk to it.** Not memorised
+commands — you say what you want, and a Gemini-powered agent reads whatever screen
+you are on and works out which buttons, filters and fields to operate.
 
 Hypothetical school: **NEW GEN HIGHER SECONDARY SCHOOL**, Perundurai Road, Erode –
 638 011. Tamil Nadu State Board, Std I–XII, Tamil and English medium.
@@ -11,24 +12,84 @@ Hypothetical school: **NEW GEN HIGHER SECONDARY SCHOOL**, Perundurai Road, Erode
 
 ## Running it
 
-No build step and no dependencies — but **serve it over `http://localhost`, do not
-double-click `index.html`.** Chrome refuses microphone access on a `file://` origin,
-so the voice engine cannot start there. A zero-dependency server is included:
-
 ```
-node serve.js            # → http://localhost:5490
-node serve.js 8080       # if that port is taken
+npm install                    # once — installs the Google GenAI SDK for the server
+cp .env.example .env           # PowerShell: Copy-Item .env.example .env
+                               # then edit .env and paste your key
+node serve.js                  # → http://localhost:5490
 ```
 
-Then open **http://localhost:5490** in **Chrome or Edge** — they are the browsers
-that ship the Web Speech API. Allow microphone access when prompted.
+Then open **http://localhost:5490** in **Chrome or Edge** and allow the microphone.
 
-Everything except voice works fine from `file://` if you would rather just
-double-click, and in Firefox or Safari the dock automatically becomes a typed
-command console driving the *identical* parser — so no feature is unreachable, you
-just type what you would have said.
+The server prints which state it is in on the first line:
 
-All data lives in `localStorage`; nothing leaves the machine.
+```
+Voice agent : ready — gemini-3.5-flash-lite
+Voice agent : DISABLED — put GEMINI_API_KEY in .env and restart
+```
+
+### Getting a free Gemini API key
+
+The voice agent runs on **Google Gemini's free tier** — no credit card, no expiry.
+
+1. Go to **[aistudio.google.com/apikey](https://aistudio.google.com/apikey)**
+2. Sign in with any Google account
+3. Click **Create API key**
+4. Pick a project when asked, or let it create one
+5. **Copy the key** — it starts `AIza…`
+6. Paste it into `.env` as `GEMINI_API_KEY=AIza…`, then restart the server
+
+That is the whole process; there is no billing step. The free tier allows roughly
+**1,000–1,500 requests a day and 15 a minute** on Flash-Lite, which comfortably
+covers a school this size.
+
+Two things worth knowing:
+
+- **Free-tier inputs may be used to improve Google's models.** For this app the
+  exposure is minimal by construction — the payload contains no student data at all,
+  only screen structure (see [What is sent to the API](#what-is-sent-to-the-api)).
+  Enabling billing on the same key removes the clause.
+- **Quota resets** per-minute after a minute, and daily at midnight US Pacific.
+  When you hit it the assistant says so out loud and stops listening rather than
+  firing doomed requests.
+
+An environment variable works too and takes precedence over `.env`:
+
+```powershell
+$env:GEMINI_API_KEY = "AIza..."   # this window only
+```
+
+The catch is that it has to be set in the **same shell** you start the server from,
+and on Windows it is gone when that window closes. `.env` avoids both problems.
+
+### Using a different provider
+
+`server/agent.js` is the only file that talks to a model. The prompt, the four-tool
+contract and the screen-manifest format are provider-neutral, and `tests/agent.test.js`
+mocks the client — so swapping to Claude, Groq, or a local Ollama model is a change to
+one file with the test suite still applying.
+
+Three things that will bite you if skipped:
+
+- **Serve it over `http://localhost`. Do not double-click `index.html`.** Chrome
+  refuses microphone access on a `file://` origin, so the agent is deaf there.
+- **The API key must be set before you start the server.** It is read from the
+  environment at startup. Without it the app still runs — every screen works by
+  keyboard — but the assistant returns a clear "no API key" message instead of
+  acting. The server prints which state it is in on boot.
+- **Chrome or Edge.** They ship the Web Speech API used to turn speech into text.
+  Elsewhere the dock falls back to a typed box that goes through the identical
+  agent, so nothing is unreachable — you type what you would have said.
+
+### Where the API key lives
+
+Server-side, always. `serve.js` proxies `POST /api/agent`; the browser never sees
+the key. A static page cannot hold one safely — view-source is all it takes. The
+`server/`, `node_modules/` and `tests/` directories are refused over HTTP for the
+same reason.
+
+All student data lives in `localStorage` and stays in the browser — see
+[What is sent to the API](#what-is-sent-to-the-api).
 
 ### Signing in
 
@@ -44,85 +105,125 @@ works**. The role you choose changes the navigation and the dashboard:
 
 ---
 
-## 🎙 Voice data entry
+## 🎙 The voice assistant
 
-The feature the application is built around. Open **New Admission** and press
-<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>.
-
-### Two modes
-
-**Guided** — the form reads each question aloud, highlights the field, and waits.
-You answer; it fills, confirms, and moves to the next one. This is the "look at the
-screen and answer orally" flow.
-
-**Free** — say the field name and the value together, in any order, at any time:
+Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> anywhere and say what you want.
+There is no command list to learn — the assistant is given the current screen and
+decides which of its controls to operate.
 
 ```
-"student name Karthik Raja"
-"date of birth twelfth March two thousand ten"
-"father name Murugesan"
-"community M B C"
-"standard ten"
-"phone nine eight four three zero four five six seven eight"
-"save"
+"Can you open the portal"                                  → opens the login
+"Show me attendance alerts"                                → navigates there
+"Which class ten students are absent today?"               → sets two filters, shows the result
+"Karthik Raja, father Murugesan, born twelfth March two    → fills eleven fields
+ thousand ten, M B C, Tamil medium, standard ten A"
+"Roll twelve is absent"                                    → marks that student
+"Mark everyone present, then save the register"            → two actions in one breath
+"What can I do on this screen?"                            → answers out loud
 ```
 
-### What it understands
-
-| Kind | Spoken | Stored |
-|---|---|---|
-| Names | "karthik raja" | `Karthik Raja` |
-| Dates | "twelfth March two thousand ten", "12 03 2010", "twenty-fifth June two thousand nine" | `2010-03-12` |
-| Numbers | "eighty seven", "nine hundred fifty", "one lakh fifty thousand" | `87`, `950`, `150000` |
-| Digit strings | "nine eight four three **double one** two three" | `98431123` |
-| Classes | "ten", "plus two", "eighth" | `X`, `XII`, `VIII` |
-| Blood groups | "o positive", "a b positive" | `O+`, `AB+` |
-| Communities | "mbc", "m b c" | `MBC` |
-| Yes/No | "yes", "no", "correct" | checkbox / dropdown |
-| Spelling | "spell K A R T H I K" | `Karthik` |
-
-Field targeting is fuzzy — `data-v` on each input lists the aliases a school clerk
-would actually use ("father name", "fathers name", "guardian name"), and the matcher
-scores the utterance against all of them.
-
-### Commands
+### How it works
 
 ```
-next · back · skip · repeat · read back      move around the form
-clear · undo                                 fix mistakes
-save · cancel                                finish
-go to attendance · open fees · show students navigate
-stop listening                               (or Ctrl+Shift+M)
-help                                         full reference
+speech  →  Web Speech API  →  text
+                                │
+                                ├─ + a manifest of THIS screen: its routes,
+                                │    buttons, fields and filter options
+                                ▼
+                    POST /api/agent  (serve.js — holds the API key)
+                                ▼
+                        Gemini, four tools:
+                        navigate · click · set_controls · respond
+                                ▼
+                       tool calls returned to the browser
+                                ▼
+                    the browser executes them on the real page
 ```
 
-### Module-specific voice
+Every screen registers what it can do:
 
-**Attendance** — voice roll call. The engine reads each name aloud; say
-`present` / `absent` / `late` to mark and advance. Jump with
-`"roll twelve absent"`. Start from a full class with `"mark all present"` and
-correct the exceptions.
+```js
+Agent.screen({
+  screen: 'attendance',
+  description: 'The daily attendance register for one standard, section and date…',
+  routes:   agentRoutes(),
+  controls: controlsFrom(document.querySelector('.toolbar')),
+  actions: [
+    { id: 'mark_all_present', label: 'Mark the whole class present', run: …  },
+    { id: 'mark_student',     label: 'Mark one student by roll number',
+      arg: 'the roll number and the status, e.g. "12 absent"',      run: … }
+  ]
+});
+```
 
-**Mark entry** — say just the score (`"eighty seven"`) for the highlighted
-student and the cursor advances by itself. Jump with `"roll five ninety two"`.
-Say `"absent"` to record a zero.
+Adding a new voice capability means adding an entry to that manifest. There is no
+grammar to extend and no parser to teach.
 
-**Fee collection** and **new circular** are voice-enabled forms inside modals.
+### What is sent to the API
+
+**The shape of the screen, and what you said. Never student records.**
+
+Asked *"which class ten students are absent today"*, the model does not receive the
+roll. It receives "there is a Standard filter with options I…XII and a Showing filter
+with options absent/present/late", replies `set_controls: class=X, showing=absent`,
+and the **browser** filters its own local data.
+
+This is not an optimisation. Under India's DPDP Act 2023 every student here is a
+child, and sending identifiable child data to a third-party API without verifiable
+parental consent is the most expensive mistake a school can make. The manifest
+boundary is what keeps that from being possible — `tests/agent.test.js` asserts that
+no seeded name, admission number, phone or Aadhaar can appear in the request payload.
+
+### The decision cache
+
+In a roll call the same sentences repeat all day — *"mark all present"*, *"save the
+register"*, *"roll twelve absent"*. Each one used to be a fresh API call re-deciding
+something already decided, which on a ~1,000-request-a-day free tier is the difference
+between lasting until lunchtime and lasting all week.
+
+The server keeps the model's own answers and replays them for the same words on the
+same screen. It's shared across the whole school, so when one teacher's phrasing is
+learned, every other teacher gets it free. The dock shows **↺ from memory** and a
+running count of calls saved.
+
+**This is not the old parser coming back.** It never interprets anything — it only
+repeats a decision the model itself made. A miss costs an API call; it can never cause
+a wrong action. What it refuses to cache is the load-bearing part:
+
+| Refused | Why |
+|---|---|
+| *"change **it** to eleven"*, *"do that **again**"*, *"mark **her** absent"* | Only means something in context; replaying an old answer would be confidently wrong |
+| *"who is absent **today**"*, *"show **tomorrow**"* | Anchored to the present — the answer would rot overnight |
+| Any decision that wrote a **resolved date** | Same reason, caught even when the wording looked safe |
+| A screen whose **actions or dropdown options changed** | A cached call could name a control that no longer exists |
+| **Failed** requests | Only successful decisions are ever stored |
+
+Current control *values* are deliberately **not** part of the key — "mark all present"
+is the same decision whether the class filter reads X or XI, and keying on values would
+collapse the hit rate to nothing.
+
+Capped at 500 entries (LRU) with a 24-hour expiry, held in memory — restarting the
+server clears it.
+
+### When something is not possible
+
+The assistant will not silently do nothing. If a request does not map onto anything
+on the current screen it says so and names what *is* available; if it is ambiguous in
+a way that changes the outcome it asks one short question. A tool call naming a
+control or action that does not exist is reported in the transcript rather than
+swallowed.
 
 ### Language
 
-English (`en-IN`) and Tamil (`ta-IN`), switchable from the dock or Settings without
-leaving the page. Tamil aliases (`data-v-ta`) are attached to the admission fields,
-and the common Tamil commands are recognised (அடுத்து, சேமி, அழி, நிறுத்து…).
+English (`en-IN`) and Tamil (`ta-IN`), switchable from the dock or Settings. Speech
+recognition quality on Tamil proper nouns is the weakest link in the chain — see
+[Notes and limits](#notes-and-limits).
 
 ### Shortcuts
 
 | Key | Action |
 |---|---|
-| <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> | Guided voice entry on the open form |
-| <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd> | Toggle the microphone |
-
----
+| <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> | Start / stop listening |
 
 ---
 
@@ -205,16 +306,16 @@ gallery, notice board, contact, and a role-picker login.
 | 🎁 Scholarship Match | 10 TN & GoI schemes matched with full reasoning |
 | Student Master | ~370 seeded students, filter by class/section/medium/community, search, CSV export |
 | Student Profile | Personal & family, academics, fees, attendance — with certificate generation |
-| New Admission | The 22-field voice-enabled admission form |
-| Attendance | Daily roll call with voice, absentee SMS queue, register save |
-| Mark Entry | Class × exam × subject grid with voice scoring, live average and fail count |
+| New Admission | 21-field admission form — dictate it or type it |
+| Attendance | Daily roll call, status filter, absentee SMS queue, register save |
+| Mark Entry | Class × exam × subject grid, live average and fail count |
 | Report Cards | Printable progress report with grades, class rank and attendance |
-| Fee Collection | Monthly collection chart, receipt register, voice-enabled collection modal |
+| Fee Collection | Monthly collection chart, receipt register, collection form |
 | Fee Dues | Defaulter list with balances and reminder dispatch |
 | Staff | Teaching and non-teaching register, pupil–teacher ratio |
-| Circulars | Notice board with voice-dictated new circulars |
+| Circulars | Notice board, dictate a new circular |
 | Reports & Govt. | EMIS/UDISE+ style community and medium returns, downloadable statutory registers |
-| Settings | Theme, voice language, TTS toggle, school profile, demo data reset |
+| Settings | Theme, assistant language and status, school profile, demo data reset |
 
 Tamil Nadu specifics are modelled throughout: EMIS and UDISE pupil IDs, community
 categories (OC/BC/BCM/MBC/SC/ST), RTE 25% seats, Std XI–XII group choice, quarterly
@@ -226,38 +327,49 @@ and public-exam attendance eligibility at 75%.
 ## Layout
 
 ```
-index.html                  public site + login
+index.html                  public site + login (agent enabled)
 app.html                    portal shell
-serve.js                    zero-dependency static server (node serve.js)
+serve.js                    static server + POST /api/agent proxy
+server/
+  agent.js                  the agent's brain — prompt, tools, Gemini call
+                            (never served over HTTP; the API key lives here)
+  cache.js                  replays decisions the model already made
 assets/
   css/
     base.css                design tokens, reset, components, dark theme
     site.css                landing page
     app.css                 portal shell, dashboards, tables
-    voice.css               voice dock and in-form affordances
+    agent.css               the assistant dock
     ai.css                  AI visual language — aurora band, beacons, gauges
   js/
     core.js                 storage, seed data, formatters, toasts, theme
-    voice.js                the voice engine
-    ai.js                   the three intelligence engines
-    app.js                  router and every module view
+    agent.js                speech capture, screen manifests, tool execution
+    ai.js                   the three on-device intelligence engines
+    app.js                  router, every module view, every screen manifest
 tests/
-  voice-parser.test.js      spoken-value parsers
+  agent.test.js             the voice agent, with the model call mocked
   ai.test.js                attendance / data-quality / scholarship engines
 ```
+
+Only the server needs npm. The browser side stays dependency-free.
 
 ## Tests
 
 ```
-node tests/voice-parser.test.js     # 35 assertions
-node tests/ai.test.js               # 63 assertions
+npm test                     # both suites
+node tests/agent.test.js     # 56 assertions — no API key needed
+node tests/ai.test.js        # 65 assertions — no dependencies
 ```
 
-No dependencies. The voice suite covers number words, digit strings, date forms,
-spoken dropdown options and name casing. The AI suite covers seed integrity (including
-student-id uniqueness), every anomaly detector, forecast boundaries, each data-quality
-rule against hand-built valid and invalid records, and scholarship eligibility including
-income ceilings and near-miss classification.
+`agent.test.js` mocks the model call, so it runs offline. It checks the request
+shape (correct model, JSON schemas, forced function calling, thinking off), the
+screen inventory the model is shown, **that no student data can reach the payload**,
+and that returned tool calls actually drive a page — including that an unknown action
+or an impossible value is surfaced rather than silently dropped.
+
+`ai.test.js` covers seed integrity (student-id *and* roll-number uniqueness), every
+anomaly detector, forecast boundaries, each data-quality rule against hand-built valid
+and invalid records, and scholarship eligibility including income ceilings.
 
 ---
 
@@ -265,11 +377,24 @@ income ceilings and near-miss classification.
 
 - **Demo data.** Everything is generated deterministically on first load and stored
   in `localStorage`. *Settings → Reset demo data* restores it.
-- **Recognition accuracy** depends on the browser's cloud speech service, the
-  microphone and the accent. Indian-English names are the hard case; the spelling
-  mode (`"spell ..."`) is the escape hatch, and every field still accepts typing.
-- Tamil recognition quality varies more than English; the engine accepts Tamil field
-  aliases and commands, but Tamil dictation of proper nouns is the weakest path.
+- **Speech recognition is the weakest link, not the agent.** The browser's Web Speech
+  API turns your voice into text before the model sees anything; Indian-English and Tamil
+  proper nouns are where it struggles. If a name comes out wrong, the agent faithfully
+  fills in the wrong name. Every field still accepts typing, and the dock's text box
+  runs the same agent.
+- **Each *new* utterance is one API call, and the free tier is finite.** Roughly
+  1,000–1,500 a day and 15 a minute on Flash-Lite. Repeated phrasings are replayed
+  from the [decision cache](#the-decision-cache) for free, so the practical ceiling is
+  much higher than the raw number — but the first time anyone says something, it costs
+  a call. When the quota goes, the assistant says so and stops listening.
+- **Flash-Lite is a small model.** It handles navigation and filters reliably; spoken
+  dates and Tamil names dictated into the admission form are where it is weakest. If
+  that matters more than quota, set `GEMINI_MODEL=gemini-3.6-flash` in `.env`.
+- **Latency is real.** Expect a second or two between speaking and the screen moving.
+  The dock shows a spinner so it does not look frozen.
+- **The agent only knows what a screen declares.** If a control is missing from a
+  manifest, the assistant genuinely cannot operate it — and will say so rather than
+  guess.
 - SMS, payment gateway, EMIS upload and file downloads are simulated — they raise a
   toast rather than calling a real service.
 - This is a demonstration build, not a production deployment: no backend, no

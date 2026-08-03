@@ -41,6 +41,22 @@ ok('admission numbers are unique',
   new Set(DB.students.map(s => s.adm)).size === DB.students.length);
 ok('the demo child S4102 exists exactly once',
   DB.students.filter(s => s.id === 'S4102').length === 1);
+ok('roll numbers are unique within every section', (() => {
+  const seen = new Set();
+  return DB.students.every(s => {
+    const k = `${s.cls}-${s.sec}-${s.roll}`;
+    if (seen.has(k)) return false;
+    seen.add(k); return true;
+  });
+})());
+ok('every section starts at roll 1', (() => {
+  const bySec = {};
+  DB.students.forEach(s => {
+    const k = `${s.cls}-${s.sec}`;
+    bySec[k] = Math.min(bySec[k] ?? Infinity, s.roll);
+  });
+  return Object.values(bySec).every(min => min === 1);
+})());
 ok('working days computed', WORKING_DAYS.length > 30, `${WORKING_DAYS.length} days`);
 ok('every student has a daily history',
   DB.students.every(s => (DB.attHistory[s.id] || '').length === WORKING_DAYS.length));

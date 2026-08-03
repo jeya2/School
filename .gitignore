@@ -1,19 +1,21 @@
 # ── Dependencies ────────────────────────────────────────────
-# The application itself is dependency-free and needs no build step.
-# These only appear if someone runs npm install for tooling.
+# The browser side is dependency-free. The server needs @anthropic-ai/sdk,
+# so package-lock.json IS committed — it pins the version the agent was
+# tested against.
 node_modules/
-package-lock.json
 yarn.lock
 npm-debug.log*
 yarn-error.log*
 .npm/
 
 # ── Environment & secrets ───────────────────────────────────
-# Nothing here needs an API key today. When the AI layer moves to a
-# hosted model, the key belongs in a server-side .env — never in the
-# client-side JavaScript this repo ships.
+# The voice agent needs ANTHROPIC_API_KEY, read from the environment by
+# serve.js. Never put it in a committed file, and never in the client-side
+# JavaScript this repo ships — view-source is all it takes to lift it.
 .env
-.env.*
+.env.local
+.env.*.local
+# .env.example is the committed template — it holds a placeholder, not a key
 !.env.example
 *.pem
 *.key

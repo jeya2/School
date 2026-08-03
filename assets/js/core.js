@@ -288,9 +288,18 @@ function buildStudents() {
     const clash = out.find(s => s.id === 'S4102' && s !== anchor);
     if (clash) { clash.id = anchor.id; clash.adm = anchor.adm; }
     anchor.id = 'S4102'; anchor.adm = 'NG4102';
+
+    /* Same trap for the roll number: pinning the demo child to roll 12 by
+       assignment would leave the section with two roll 12s and no roll 1, which
+       breaks every "roll number N" lookup. Swap with whoever holds 12. */
+    const rollClash = out.find(s => s.cls === anchor.cls && s.sec === anchor.sec
+                                 && s.roll === 12 && s !== anchor);
+    if (rollClash) rollClash.roll = anchor.roll;
+    anchor.roll = 12;
+
     anchor.name = 'Karthik Raja'; anchor.gender = 'Male';
     anchor.father = 'Murugesan'; anchor.mother = 'Amutha';
-    anchor.roll = 12; anchor.community = 'MBC'; anchor.medium = 'Tamil';
+    anchor.community = 'MBC'; anchor.medium = 'Tamil';
     anchor.dob = '2010-03-12'; anchor.phone = '9843045678';
     anchor.income = 96000; anchor.firstGraduate = true; anchor.cwsn = false;
     anchor.aadhaar = '482913756240'; anchor.address = '42, Perundurai Road, Erode';

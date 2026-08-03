@@ -30,7 +30,7 @@ function openModal({ title, body, actions = [], wide = false, onOpen }) {
 }
 function closeModal() {
   document.getElementById('modalHost').innerHTML = '';
-  if (Voice.container && !document.body.contains(Voice.container)) Voice.detach();
+  route();   // re-publishes the underlying screen's manifest to the agent
 }
 addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
@@ -85,10 +85,29 @@ function paintNav() {
   document.getElementById('userName').textContent = u.name;
   document.getElementById('userRole').textContent = u.title;
 
-  const map = {};
-  NAV.forEach(g => g.items.filter(allowed).forEach(it => map[it.id] = it.label));
-  map.dashboard = 'dashboard home';
-  Voice.registerNav(map);
+}
+
+/** Every screen this role may open — the agent's navigation vocabulary. */
+function agentRoutes() {
+  return NAV.flatMap(g => g.items).filter(allowed).map(it => ({ id: it.id, label: it.label }));
+}
+
+/** Turn every labelled input inside a container into an agent control. */
+function controlsFrom(container, extra = {}) {
+  if (!container) return [];
+  return [...container.querySelectorAll('input[id], select[id], textarea[id]')]
+    .filter(el => !el.disabled && !el.readOnly && el.type !== 'hidden')
+    .map(el => {
+      const label = el.closest('.field')?.querySelector('label')?.textContent
+        || document.querySelector(`label[for="${el.id}"]`)?.textContent
+        || el.placeholder || el.name || el.id;
+      return {
+        id: el.id,
+        label: label.replace(/\*/g, '').trim(),
+        el,
+        hint: extra[el.id]
+      };
+    });
 }
 
 /* ───────────────────────── router ────────────────────────── */
@@ -103,14 +122,24 @@ function route() {
   const fn = ROUTES[id];
   if (!fn) { location.hash = '#dashboard'; return; }
 
-  Voice.detach();
-  Voice.onCommand = null;
   document.querySelectorAll('[data-nav]').forEach(a => a.classList.toggle('on', a.dataset.nav === id));
   document.getElementById('appSide').classList.remove('open');
   document.querySelector('.side-scrim')?.remove();
   const view = document.getElementById('view');
   view.innerHTML = '';
   view.className = 'view fade-up';
+
+  /* Baseline manifest: navigation always works. Each route replaces this
+     with its own, richer one — and any that forgets still leaves the agent
+     able to move around rather than stranded. */
+  Agent.screen({
+    screen: id,
+    label: (NAV.flatMap(g => g.items).find(i => i.id === id) || {}).label || id,
+    description: 'A screen in the school management portal.',
+    role: DEMO_USERS[ROLE].title,
+    routes: agentRoutes()
+  });
+
   fn(view, params);
   scrollTo({ top: 0, behavior: 'instant' });
 }
@@ -401,16 +430,27 @@ ROUTES.students = view => {
   document.getElementById('expBtn').onclick = () => exportCSV();
   apply();
 
-  Voice.onCommand = n => {
-    const m = n.match(/^(?:search|find|look for)\s+(.+)$/);
-    if (m) { stuFilter.q = m[1]; document.getElementById('fq').value = m[1]; apply(); return true; }
-    const c = n.match(/^(?:show|filter)?\s*(?:class|standard)\s+([ivx]+)$/i);
-    if (c) {
-      const cls = c[1].toUpperCase();
-      if (CLASSES.includes(cls)) { stuFilter.cls = cls; document.getElementById('fc').value = cls; apply(); return true; }
-    }
-    return false;
-  };
+  Agent.screen({
+    screen: 'students',
+    label: 'Student Master',
+    description:
+      'The full student roll. Filter it by standard, section, medium of instruction and community, ' +
+      'or search by name or admission number. Narrowing questions about which students match some ' +
+      'description are answered by setting these filters.',
+    role: DEMO_USERS[ROLE].title,
+    routes: agentRoutes(),
+    controls: controlsFrom(document.querySelector('.toolbar'), {
+      fq: 'free-text search over student name and admission number',
+      fc: 'Roman numerals I to XII',
+      fs: 'section letter'
+    }),
+    actions: [
+      { id: 'clear_filters', label: 'Clear all filters', run: () => document.getElementById('fclear').click() },
+      { id: 'export_csv', label: 'Export the student list to CSV', run: () => exportCSV() },
+      ...(['admin', 'principal'].includes(ROLE)
+        ? [{ id: 'new_admission', label: 'Start a new admission', run: () => location.hash = '#admission' }] : [])
+    ]
+  });
 };
 
 function exportCSV() {
@@ -546,6 +586,24 @@ ROUTES.student = (view, p) => {
   };
   document.querySelectorAll('#pTabs button').forEach(b => b.onclick = () => paint(b.dataset.t));
   paint('info');
+
+  Agent.screen({
+    screen: 'student',
+    label: 'Student Record',
+    description: `One student's full record, with tabs for personal and family details, academics, fees and attendance.`,
+    role: DEMO_USERS[ROLE].title,
+    routes: agentRoutes(),
+    actions: [
+      ...['info', 'acad', 'fee', 'att'].map((t, i) => ({
+        id: 'tab_' + t,
+        label: 'Show the ' + ['personal and family', 'academics', 'fees', 'attendance'][i] + ' tab',
+        run: () => paint(t)
+      })),
+      { id: 'report_card', label: 'Open this student\'s report card', run: () => location.hash = '#exams?id=' + s.id },
+      { id: 'certificates', label: 'Generate a certificate', run: () => tcModal(s.id) },
+      { id: 'back_to_list', label: 'Go back to the student master', run: () => location.hash = '#students' }
+    ]
+  });
 };
 
 function tcModal(id) {
@@ -565,90 +623,91 @@ function tcModal(id) {
   });
 }
 
-/* ═══════════════════════════ NEW ADMISSION (voice showcase) ═══════════════════════════ */
+/* ═══════════════════════════ NEW ADMISSION ═══════════════════════════ */
 ROUTES.admission = view => {
-  setHead('New Admission', 'Voice-enabled admission form');
+  setHead('New Admission', 'Dictate it or type it');
   view.innerHTML = `
     <div class="page-head">
-      <div><h1>New Admission</h1><p>Academic year ${SCHOOL.year} · every field accepts voice or keyboard.</p></div>
+      <div><h1>New Admission</h1><p>Academic year ${SCHOOL.year} · dictate the record or fill it in by hand.</p></div>
       <div class="row">
         <button class="btn btn-ghost" id="demoFill">⚡ Fill sample</button>
-        <button class="btn btn-voice" id="startVoice">🎙 Start guided voice entry</button>
+        <button class="btn btn-agent" id="startVoice">🎙 Dictate this form</button>
       </div>
     </div>
 
-    <div class="v-banner">
+    <div class="ag-banner">
       <span class="em">🎙</span>
-      <p><strong>Voice entry is on.</strong> Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> and the form will ask you
-      each question aloud — just answer. Or say a field by name any time, e.g.
-      <em>“father name Murugesan”</em>, <em>“date of birth twelfth March two thousand ten”</em>, <em>“community M B C”</em>, then <em>“save”</em>.</p>
+      <p><strong>Say the record however you like.</strong> Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> and talk —
+      <em>“Karthik Raja, father Murugesan, born twelfth March two thousand ten, M B C, Tamil medium, standard ten A”</em> —
+      and the assistant works out which box each part belongs in. One field at a time works just as well, and so does
+      the keyboard.</p>
     </div>
 
     <form id="admForm" class="grid" style="gap:1.15rem" onsubmit="return false">
       <div class="card">
-        <div class="card-head"><h3>1 · Student Details</h3><span class="badge badge-voice">🎙 8 fields</span></div>
+        <div class="card-head"><h3>1 · Student Details</h3></div>
         <div class="card-body grid g3">
           <div class="field"><label class="req" for="a_name">Student Name</label>
-            <input class="input" id="a_name" data-v="student name|name|pupil name|child name|full name" data-v-ta="மாணவர் பெயர்" required></div>
+            <input class="input" id="a_name" required></div>
           <div class="field"><label class="req" for="a_gender">Gender</label>
-            <select class="select" id="a_gender" data-v="gender|sex" data-v-ta="பாலினம்"><option value="">—</option><option>Male</option><option>Female</option><option>Transgender</option></select></div>
+            <select class="select" id="a_gender"><option value="">—</option><option>Male</option><option>Female</option><option>Transgender</option></select></div>
           <div class="field"><label class="req" for="a_dob">Date of Birth</label>
-            <input class="input" type="date" id="a_dob" data-v="date of birth|dob|birth date|born on" data-v-ta="பிறந்த தேதி"></div>
+            <input class="input" type="date" id="a_dob"></div>
           <div class="field"><label for="a_blood">Blood Group</label>
-            <select class="select" id="a_blood" data-v="blood group|blood"><option value="">—</option>${optList(BLOOD)}</select></div>
+            <select class="select" id="a_blood"><option value="">—</option>${optList(BLOOD)}</select></div>
           <div class="field"><label class="req" for="a_comm">Community</label>
-            <select class="select" id="a_comm" data-v="community|caste|category" data-v-ta="சமூகம்"><option value="">—</option>${optList(COMMUNITIES)}</select></div>
+            <select class="select" id="a_comm"><option value="">—</option>${optList(COMMUNITIES)}</select></div>
           <div class="field"><label for="a_rel">Religion</label>
-            <select class="select" id="a_rel" data-v="religion" data-v-ta="மதம்"><option value="">—</option>${optList(RELIGIONS)}</select></div>
+            <select class="select" id="a_rel"><option value="">—</option>${optList(RELIGIONS)}</select></div>
           <div class="field"><label for="a_aadhaar">Aadhaar Number</label>
-            <input class="input" id="a_aadhaar" data-v="aadhaar|aadhar|aadhaar number|uid" maxlength="12" inputmode="numeric" placeholder="12 digits"></div>
+            <input class="input" id="a_aadhaar" maxlength="12" inputmode="numeric" placeholder="12 digits"></div>
           <div class="field"><label for="a_emis">EMIS ID</label>
-            <input class="input" id="a_emis" data-v="emis|emis id|emis number" placeholder="auto if left blank"></div>
+            <input class="input" id="a_emis" placeholder="auto if left blank"></div>
         </div>
       </div>
 
       <div class="card">
-        <div class="card-head"><h3>2 · Parent / Guardian</h3><span class="badge badge-voice">🎙 6 fields</span></div>
+        <div class="card-head"><h3>2 · Parent / Guardian</h3></div>
         <div class="card-body grid g3">
           <div class="field"><label class="req" for="a_father">Father Name</label>
-            <input class="input" id="a_father" data-v="father name|father|fathers name|guardian name" data-v-ta="தந்தை பெயர்"></div>
+            <input class="input" id="a_father"></div>
           <div class="field"><label for="a_focc">Father Occupation</label>
-            <select class="select" id="a_focc" data-v="father occupation|occupation|fathers job"><option value="">—</option>${optList(OCCUPATIONS)}</select></div>
+            <select class="select" id="a_focc"><option value="">—</option>${optList(OCCUPATIONS)}</select></div>
           <div class="field"><label class="req" for="a_mother">Mother Name</label>
-            <input class="input" id="a_mother" data-v="mother name|mother|mothers name" data-v-ta="தாய் பெயர்"></div>
+            <input class="input" id="a_mother"></div>
           <div class="field"><label class="req" for="a_phone">Contact Number</label>
-            <input class="input" type="tel" id="a_phone" data-v="phone|phone number|mobile|contact number|cell number" data-v-ta="தொலைபேசி எண்" maxlength="10" inputmode="numeric"></div>
+            <input class="input" type="tel" id="a_phone" maxlength="10" inputmode="numeric"></div>
           <div class="field" style="grid-column:span 2"><label class="req" for="a_addr">Address</label>
-            <input class="input" id="a_addr" data-v="address|residence|door number|street" data-v-ta="முகவரி"></div>
+            <input class="input" id="a_addr"></div>
         </div>
       </div>
 
       <div class="card">
-        <div class="card-head"><h3>3 · Academic Placement</h3><span class="badge badge-voice">🎙 5 fields</span></div>
+        <div class="card-head"><h3>3 · Academic Placement</h3></div>
         <div class="card-body grid g3">
           <div class="field"><label class="req" for="a_cls">Standard</label>
-            <select class="select" id="a_cls" data-v="standard|class|std|grade" data-v-ta="வகுப்பு"><option value="">—</option>${optList(CLASSES)}</select></div>
+            <select class="select" id="a_cls"><option value="">—</option>${optList(CLASSES)}</select></div>
           <div class="field"><label class="req" for="a_sec">Section</label>
-            <select class="select" id="a_sec" data-v="section|division"><option value="">—</option>${optList(SECTIONS)}</select></div>
+            <select class="select" id="a_sec"><option value="">—</option>${optList(SECTIONS)}</select></div>
           <div class="field"><label class="req" for="a_med">Medium</label>
-            <select class="select" id="a_med" data-v="medium|medium of instruction|language" data-v-ta="பயிற்று மொழி"><option value="">—</option>${optList(MEDIUMS)}</select></div>
+            <select class="select" id="a_med"><option value="">—</option>${optList(MEDIUMS)}</select></div>
           <div class="field"><label for="a_group">Group (Std XI–XII)</label>
-            <select class="select" id="a_group" data-v="group|subject group|stream"><option value="">—</option>${optList(GROUPS)}</select></div>
+            <select class="select" id="a_group"><option value="">—</option>${optList(GROUPS)}</select></div>
           <div class="field"><label for="a_prev">Previous School</label>
-            <input class="input" id="a_prev" data-v="previous school|last school|old school"></div>
+            <input class="input" id="a_prev"></div>
         </div>
       </div>
 
       <div class="card">
-        <div class="card-head"><h3>4 · Concessions & Facilities</h3><span class="badge badge-voice">🎙 3 fields</span></div>
+        <div class="card-head"><h3>4 · Concessions & Facilities</h3></div>
         <div class="card-body grid g3">
           <div class="field"><label for="a_transport">Transport Route</label>
-            <select class="select" id="a_transport" data-v="transport|bus route|route"><option value="">Own arrangement</option>
+            <select class="select" id="a_transport"><option value="">Own arrangement</option>
               ${optList(['Route 1 · Chithode','Route 2 · Thindal','Route 3 · Nasiyanur','Route 4 · Perundurai'])}</select></div>
           <div class="field"><label for="a_rte">RTE 25% Seat</label>
-            <select class="select" id="a_rte" data-v="r t e|rte|rte seat|free seat"><option value="No">No</option><option value="Yes">Yes</option></select></div>
+            <select class="select" id="a_rte"><option value="No">No</option><option value="Yes">Yes</option></select></div>
           <div class="field"><label for="a_sibling">Sibling in this school</label>
-            <select class="select" id="a_sibling" data-v="sibling|brother or sister|sibling concession"><option value="No">No</option><option value="Yes">Yes</option></select></div>
+            <select class="select" id="a_sibling"><option value="No">No</option><option value="Yes">Yes</option></select></div>
         </div>
         <div class="card-foot row" style="justify-content:space-between">
           <span class="small muted" id="admProgress">0 of 22 fields completed</span>
@@ -670,7 +729,7 @@ ROUTES.admission = view => {
     if (missing.length) {
       missing.forEach(([id]) => document.getElementById(id).closest('.field').classList.add('invalid'));
       toast(`Please complete: ${missing.map(m => m[1]).join(', ')}`, 'err', 5000);
-      Voice.say('Missing ' + missing.map(m => m[1]).join(', '));
+      Agent.say('Still missing ' + missing.map(m => m[1]).join(', '));
       document.getElementById(missing[0][0]).focus();
       return;
     }
@@ -691,8 +750,8 @@ ROUTES.admission = view => {
     DB.students.push(s); DB.save('students');
     DB.attHistory[s.id] = ''; DB.save('attHistory');
     AI.bust();
-    Voice.stop();
     toast(`Admission ${s.adm} created for ${s.name}.`, 'ok', 4500);
+    Agent.say(`Saved. ${s.name} is admitted to standard ${s.cls} ${s.sec}, admission number ${s.adm}.`);
     openModal({
       title: '✅ Admission Saved',
       body: `<div style="text-align:center;padding:1rem 0">
@@ -712,8 +771,9 @@ ROUTES.admission = view => {
     });
   };
 
+  const fields = () => [...form.querySelectorAll('input[id], select[id]')];
   const progress = () => {
-    const fs = [...form.querySelectorAll('[data-v]')];
+    const fs = fields();
     const done = fs.filter(f => f.value.trim()).length;
     document.getElementById('admProgress').textContent = `${done} of ${fs.length} fields completed`;
   };
@@ -722,8 +782,8 @@ ROUTES.admission = view => {
     progress();
   });
   document.getElementById('admSave').onclick = save;
-  document.getElementById('admCancel').onclick = () => { Voice.stop(); location.hash = '#students'; };
-  document.getElementById('startVoice').onclick = () => Voice.startGuided();
+  document.getElementById('admCancel').onclick = () => location.hash = '#students';
+  document.getElementById('startVoice').onclick = () => Agent.start();
   document.getElementById('demoFill').onclick = () => {
     const d = { a_name:'Karthik Raja', a_gender:'Male', a_dob:'2010-03-12', a_blood:'O+',
       a_comm:'MBC', a_rel:'Hindu', a_aadhaar:'482913756240', a_father:'Murugesan',
@@ -735,29 +795,59 @@ ROUTES.admission = view => {
     toast('Sample data filled — now try editing a field by voice.', 'ok');
   };
 
-  Voice.attach(form, { onSave: save, onCancel: () => { Voice.stop(); location.hash = '#students'; } });
+  Agent.screen({
+    screen: 'admission',
+    label: 'New Admission',
+    description:
+      'A blank admission form for enrolling a new student. Dictated details go into these fields. ' +
+      'Names are Tamil — title-case them and do not anglicise them. Dates are stored as YYYY-MM-DD, ' +
+      'the standard is a Roman numeral, and phone and Aadhaar are digits with no spaces.',
+    role: DEMO_USERS[ROLE].title,
+    routes: agentRoutes(),
+    controls: controlsFrom(form, {
+      a_dob: 'the student\'s date of birth',
+      a_phone: '10 digits, no spaces',
+      a_aadhaar: '12 digits, no spaces',
+      a_cls: 'Roman numeral I to XII',
+      a_group: 'only for standards XI and XII',
+      a_emis: 'leave blank to auto-generate'
+    }),
+    actions: [
+      { id: 'save', label: 'Save the admission', run: save },
+      { id: 'cancel', label: 'Cancel and go back to the student list', run: () => location.hash = '#students' },
+      { id: 'fill_sample', label: 'Fill the form with sample data', run: () => document.getElementById('demoFill').click() }
+    ]
+  });
   progress();
 };
 
 /* ═══════════════════════════ ATTENDANCE ═══════════════════════════ */
-let attState = { cls: 'X', sec: 'A', date: todayISO(), marks: {}, cursor: 0 };
+let attState = { cls: 'X', sec: 'A', date: todayISO(), marks: {}, cursor: 0, show: '' };
 ROUTES.attendance = view => {
   setHead('Attendance', 'Daily roll call');
   view.innerHTML = `
     <div class="page-head">
-      <div><h1>Attendance</h1><p>Mark by tapping, or run a voice roll call — say <em>present</em>, <em>absent</em> or <em>late</em>.</p></div>
-      <button class="btn btn-voice" id="rollVoice">🎙 Voice roll call</button>
+      <div><h1>Attendance</h1><p>Tap to mark, or just say it — the assistant works the register with you.</p></div>
+      <button class="btn btn-agent" id="rollVoice">🎙 Talk to the assistant</button>
     </div>
-    <div class="v-banner">
+    <div class="ag-banner">
       <span class="em">🎙</span>
-      <p><strong>Voice roll call.</strong> The engine reads each name aloud and waits. Say
-      <em>present</em> / <em>absent</em> / <em>late</em> to mark and move on, or jump anywhere with
-      <em>“roll twelve absent”</em>. Say <em>“mark all present”</em> to start from a full class, then correct the exceptions.</p>
+      <p><strong>Say it however you would to a colleague.</strong>
+      <em>“Mark everyone present”</em>, <em>“roll twelve is absent”</em>, <em>“save the register”</em> — or ask a question:
+      <em>“show me all class ten students who are absent today”</em> sets the standard and the status filter for you.</p>
     </div>
     <div class="toolbar">
       <label class="lbl">Standard</label>${classSelect('ac', attState.cls, 'Select')}
       <label class="lbl">Section</label>${secSelect('as', attState.sec)}
       <label class="lbl">Date</label><input class="input" type="date" id="ad" value="${attState.date}">
+      <label class="lbl">Showing</label>
+      <select class="select" id="ashow">
+        <option value="">Everyone</option>
+        <option value="A">Absent only</option>
+        <option value="P">Present only</option>
+        <option value="L">Late only</option>
+        <option value="U">Not yet marked</option>
+      </select>
       <button class="btn btn-ghost btn-sm" id="allP">✓ All Present</button>
       <div class="spacer"></div>
       <span id="attSummary" class="small muted"></span>
@@ -767,17 +857,29 @@ ROUTES.attendance = view => {
 
   const key = () => `${attState.date}|${attState.cls}|${attState.sec}`;
   const list = () => DB.byClass(attState.cls, attState.sec);
+  /* What the register currently shows, after the status filter. */
+  const shown = () => list().filter(s => {
+    if (!attState.show) return true;
+    const v = attState.marks[s.id];
+    return attState.show === 'U' ? !v : v === attState.show;
+  });
 
   function paint() {
-    const students = list();
+    const all = list();
+    const students = shown();
     const host = document.getElementById('rollList');
-    if (!students.length) {
+    if (!all.length) {
       host.innerHTML = `<div class="empty"><div class="ico">📋</div>Choose a standard and section.</div>`;
       document.getElementById('attSummary').textContent = ''; return;
     }
-    host.innerHTML = students.map((s, i) => {
+    if (!students.length) {
+      const label = { A: 'absent', P: 'present', L: 'late', U: 'unmarked' }[attState.show];
+      host.innerHTML = `<div class="empty"><div class="ico">✅</div>
+        No student in ${attState.cls}-${attState.sec} is ${label} on ${fmtDate(attState.date)}.</div>`;
+    } else
+    host.innerHTML = students.map(s => {
       const v = attState.marks[s.id];
-      return `<div class="roll-row ${i === attState.cursor ? 'cur' : ''}" data-i="${i}">
+      return `<div class="roll-row">
         <div class="roll-no">${s.roll}</div>
         <div class="roll-name">${esc(s.name)}<small>${s.adm} · ${s.gender} · overall ${pct(s.attPresent, s.attTotal)}%</small></div>
         <div class="pab" data-sid="${s.id}">
@@ -787,42 +889,38 @@ ROUTES.attendance = view => {
     host.querySelectorAll('.pab button').forEach(b => b.onclick = () => {
       mark(b.parentElement.dataset.sid, b.dataset.s);
     });
-    host.querySelectorAll('.roll-row').forEach(r => r.onclick = e => {
-      if (e.target.closest('.pab')) return;
-      attState.cursor = +r.dataset.i; paint();
-    });
-    const vals = Object.values(attState.marks);
+
+    const vals = all.map(s => attState.marks[s.id]).filter(Boolean);
     const p = vals.filter(v => v === 'P').length, a = vals.filter(v => v === 'A').length, l = vals.filter(v => v === 'L').length;
     document.getElementById('attSummary').innerHTML =
       `<span class="badge badge-ok">${p} present</span> <span class="badge badge-danger">${a} absent</span>
-       <span class="badge badge-warn">${l} late</span> <span class="badge">${students.length - vals.length} unmarked</span>`;
+       <span class="badge badge-warn">${l} late</span> <span class="badge">${all.length - vals.length} unmarked</span>` +
+      (attState.show ? ` <span class="badge badge-brand">showing ${students.length} of ${all.length}</span>` : '');
   }
 
   function mark(sid, v) {
     attState.marks[sid] = v;
-    const i = list().findIndex(s => s.id === sid);
-    if (i === attState.cursor) attState.cursor = Math.min(list().length - 1, attState.cursor + 1);
     paint();
-    scrollCursor();
   }
-  function scrollCursor() {
-    document.querySelector('.roll-row.cur')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-  }
-  function promptCursor() {
-    const s = list()[attState.cursor];
-    if (!s) { Voice.say('Roll call complete. Say save to record the register.'); return; }
-    scrollCursor();
-    Voice.say(`Roll ${s.roll}. ${s.name}.`);
-    Voice.setStatus(`Roll ${s.roll} — ${s.name}. Say present, absent or late.`, 'live');
+
+  /** Mark one student by roll number. Returns a sentence for the agent transcript. */
+  function markByRoll(roll, status) {
+    const s = list().find(x => x.roll === Number(roll));
+    if (!s) throw new Error(`There is no roll number ${roll} in ${attState.cls}-${attState.sec}.`);
+    const v = { present: 'P', absent: 'A', late: 'L' }[String(status).toLowerCase()];
+    if (!v) throw new Error(`"${status}" is not present, absent or late.`);
+    mark(s.id, v);
+    return `Roll ${s.roll}, ${s.name} → ${status}`;
   }
 
   const reload = () => {
     attState.marks = Store.get('attendance', {})[key()] || {};
-    attState.cursor = 0; paint();
+    paint();
   };
-  ['ac','as','ad'].forEach((id, i) => {
+  ['ac','as','ad','ashow'].forEach((id, i) => {
     document.getElementById(id).onchange = e => {
-      attState[['cls','sec','date'][i]] = e.target.value; reload();
+      attState[['cls','sec','date','show'][i]] = e.target.value;
+      i === 3 ? paint() : reload();
     };
   });
   document.getElementById('allP').onclick = () => {
@@ -868,51 +966,40 @@ ROUTES.attendance = view => {
 
     const absent = students.filter(s => attState.marks[s.id] === 'A');
     toast(`Register saved for ${attState.cls}-${attState.sec} · ${absent.length} absentee SMS queued.`, 'ok', 4500);
-    Voice.say('Register saved.');
+    Agent.say(`Register saved. ${absent.length} absent.`);
   };
-  document.getElementById('rollVoice').onclick = () => {
-    attState.cursor = 0;
-    Voice.mode = 'free';
-    Voice.start('free');
-    Voice.say(`Roll call for standard ${attState.cls} ${attState.sec}. ${list().length} students.`, promptCursor);
-  };
+  document.getElementById('rollVoice').onclick = () => Agent.start();
 
-  Voice.attach(view, {
-    hint: 'Roll call ready — say “present”, “absent”, “late”, “roll twelve absent” or “mark all present”.',
-    onSave: () => document.getElementById('attSave').click()
+  Agent.screen({
+    screen: 'attendance',
+    label: 'Attendance',
+    description:
+      'The daily attendance register for one standard, section and date. Each student is marked P present, ' +
+      'A absent or L late. A question about which students are absent, present or late is answered by setting ' +
+      'the standard, the date and the "Showing" filter — not by naming students.',
+    role: DEMO_USERS[ROLE].title,
+    routes: agentRoutes(),
+    controls: controlsFrom(document.querySelector('.toolbar'), {
+      ac: 'Roman numeral I to XII',
+      ad: 'the register date; today is ' + todayISO(),
+      ashow: 'narrows the register to one attendance status'
+    }),
+    actions: [
+      { id: 'mark_all_present', label: 'Mark the whole class present',
+        run: () => { document.getElementById('allP').click(); return 'Marked the whole class present'; } },
+      { id: 'mark_student', label: 'Mark one student by roll number',
+        arg: 'the roll number and the status, e.g. "12 absent"',
+        run: a => {
+          const m = String(a || '').match(/(\d+)\D+(present|absent|late)/i);
+          if (!m) throw new Error('Say it as a roll number and a status, e.g. "roll twelve absent".');
+          return markByRoll(m[1], m[2]);
+        } },
+      { id: 'save_register', label: 'Save the register',
+        run: () => { document.getElementById('attSave').click(); return 'Saved the register'; } },
+      { id: 'show_everyone', label: 'Clear the status filter and show everyone',
+        run: () => { attState.show = ''; document.getElementById('ashow').value = ''; paint(); return 'Showing everyone'; } }
+    ]
   });
-  Voice.onCommand = n => {
-    const students = list();
-    if (!students.length) return false;
-
-    if (/^(mark )?all present$/.test(n)) { document.getElementById('allP').click(); return true; }
-
-    // "roll twelve absent" / "roll number 12 present"
-    const rm = n.match(/^roll(?:\s+number)?\s+(.+?)\s+(present|absent|late|here|leave)$/);
-    if (rm) {
-      const num = Voice.parse.wordsToNumber(rm[1]);
-      const s = students.find(x => x.roll === num);
-      if (s) {
-        mark(s.id, rm[2].startsWith('a') ? 'A' : rm[2].startsWith('l') ? 'L' : 'P');
-        Voice.pushLog('did', `Roll ${num} · ${s.name} → ${rm[2]}`);
-        return true;
-      }
-      Voice.setStatus(`No roll number ${num} in ${attState.cls}-${attState.sec}.`, 'warn');
-      return true;
-    }
-    // bare status for the current student
-    const bare = n.match(/^(present|here|absent|leave|late|சரி|இல்லை)$/);
-    if (bare) {
-      const s = students[attState.cursor];
-      if (!s) return true;
-      const v = /absent|leave|இல்லை/.test(bare[1]) ? 'A' : /late/.test(bare[1]) ? 'L' : 'P';
-      mark(s.id, v);
-      Voice.pushLog('did', `${s.name} → ${v === 'P' ? 'Present' : v === 'A' ? 'Absent' : 'Late'}`);
-      setTimeout(promptCursor, 260);
-      return true;
-    }
-    return false;
-  };
   reload();
 };
 
@@ -924,14 +1011,14 @@ ROUTES.marks = view => {
 
   view.innerHTML = `
     <div class="page-head">
-      <div><h1>Mark Entry</h1><p>Type the score, or speak it — the cursor advances by itself.</p></div>
-      <button class="btn btn-voice" id="mkVoice">🎙 Voice mark entry</button>
+      <div><h1>Mark Entry</h1><p>Type the scores, or read them out.</p></div>
+      <button class="btn btn-agent" id="mkVoice">🎙 Talk to the assistant</button>
     </div>
-    <div class="v-banner">
+    <div class="ag-banner">
       <span class="em">🎙</span>
-      <p><strong>Speak the marks.</strong> Start voice entry and simply say <em>“eighty seven”</em> for the highlighted
-      student — it fills and moves to the next. Jump about with <em>“roll fourteen ninety two”</em>, correct with
-      <em>“undo”</em>, finish with <em>“save”</em>.</p>
+      <p><strong>Read the marks out.</strong> <em>“Roll one eighty seven, roll two ninety two, roll three forty”</em> —
+      several at once is fine. Switch context by saying <em>“half yearly physics for twelve B”</em>, and finish with
+      <em>“save the marks”</em>.</p>
     </div>
     <div class="toolbar">
       <label class="lbl">Standard</label>${classSelect('mc', mkState.cls, 'Select')}
@@ -994,72 +1081,60 @@ ROUTES.marks = view => {
     else DB.marks[`${sid}|${mkState.term}|${mkState.subject}`] = n;
     paint();
   }
-  function focusCursor(speak) {
-    paint();
-    const inp = document.querySelector(`#mkBody input[data-i="${mkState.cursor}"]`);
-    inp?.focus({ preventScroll: true });
-    inp?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    const s = list()[mkState.cursor];
-    if (s) {
-      Voice.setStatus(`Roll ${s.roll} — ${s.name}. Say the marks out of ${maxOf(mkState.term)}.`, 'live');
-      if (speak) Voice.say(`Roll ${s.roll}. ${s.name}.`);
-    }
+  /** Record one student's score by roll number. Returns a line for the transcript. */
+  function markByRoll(roll, score) {
+    const s = list().find(x => x.roll === Number(roll));
+    if (!s) throw new Error(`There is no roll number ${roll} in ${mkState.cls}-${mkState.sec}.`);
+    const max = maxOf(mkState.term), n = Number(score);
+    if (!Number.isFinite(n) || n < 0 || n > max)
+      throw new Error(`${score} is not a mark between 0 and ${max}.`);
+    setMark(s.id, n);
+    return `Roll ${s.roll}, ${s.name} → ${n}`;
   }
 
-  document.getElementById('mc').onchange = e => { mkState.cls = e.target.value; subjOptions(); mkState.cursor = 0; paint(); };
-  document.getElementById('ms').onchange = e => { mkState.sec = e.target.value; mkState.cursor = 0; paint(); };
+  document.getElementById('mc').onchange = e => { mkState.cls = e.target.value; subjOptions(); paint(); };
+  document.getElementById('ms').onchange = e => { mkState.sec = e.target.value; paint(); };
   document.getElementById('mt').onchange = e => { mkState.term = e.target.value; paint(); };
-  document.getElementById('msub').onchange = e => { mkState.subject = e.target.value; mkState.cursor = 0; paint(); };
+  document.getElementById('msub').onchange = e => { mkState.subject = e.target.value; paint(); };
   document.getElementById('mkSave').onclick = () => {
     DB.save('marks');
     toast(`Marks saved — ${mkState.cls}-${mkState.sec} · ${mkState.subject} · ${mkState.term}.`, 'ok');
-    Voice.say('Marks saved.');
+    Agent.say('Marks saved.');
   };
-  document.getElementById('mkVoice').onclick = () => {
-    mkState.cursor = 0;
-    Voice.start('free');
-    Voice.say(`Mark entry. ${mkState.subject}, ${mkState.term}, out of ${maxOf(mkState.term)}.`, () => focusCursor(true));
-  };
+  document.getElementById('mkVoice').onclick = () => Agent.start();
 
-  Voice.attach(view, {
-    hint: 'Say the marks for the highlighted student, or “roll fourteen ninety two”.',
-    onSave: () => document.getElementById('mkSave').click()
+  Agent.screen({
+    screen: 'marks',
+    label: 'Mark Entry',
+    description:
+      `Enter examination marks for one standard, section, exam and subject at a time. ` +
+      `The current paper is out of ${maxOf(mkState.term)}. Marks are recorded per student by roll number.`,
+    role: DEMO_USERS[ROLE].title,
+    routes: agentRoutes(),
+    controls: controlsFrom(document.querySelector('.toolbar'), {
+      mc: 'Roman numeral I to XII',
+      mt: 'which examination these marks belong to',
+      msub: 'the subject; the list changes with the standard'
+    }),
+    actions: [
+      { id: 'enter_mark', label: 'Record one student\'s mark',
+        arg: `the roll number and the score, e.g. "12 87". The score must be between 0 and ${maxOf(mkState.term)}.`,
+        run: a => {
+          const m = String(a || '').match(/(\d+)\D+(\d+)/);
+          if (!m) throw new Error('Say it as a roll number and a score, e.g. "roll twelve, eighty seven".');
+          return markByRoll(m[1], m[2]);
+        } },
+      { id: 'mark_absent', label: 'Record a student as absent for this paper (scores zero)',
+        arg: 'the roll number',
+        run: a => {
+          const roll = String(a || '').match(/\d+/);
+          if (!roll) throw new Error('Which roll number?');
+          return markByRoll(roll[0], 0) + ' (absent)';
+        } },
+      { id: 'save_marks', label: 'Save the marks',
+        run: () => { document.getElementById('mkSave').click(); return 'Saved the marks'; } }
+    ]
   });
-  Voice.onCommand = n => {
-    const students = list();
-    if (!students.length) return false;
-
-    const rm = n.match(/^roll(?:\s+number)?\s+(.+?)\s+(?:gets?|scored?|marks?)?\s*([\w\s]+)$/);
-    if (rm) {
-      const roll = Voice.parse.wordsToNumber(rm[1]);
-      const val = Voice.parse.wordsToNumber(rm[2]);
-      const i = students.findIndex(s => s.roll === roll);
-      if (i >= 0 && val !== null) {
-        mkState.cursor = i; setMark(students[i].id, val);
-        Voice.pushLog('did', `Roll ${roll} · ${students[i].name} → ${val}`);
-        mkState.cursor = Math.min(students.length - 1, i + 1);
-        focusCursor(false);
-        return true;
-      }
-    }
-    if (/^(absent|a b|not written|missing)$/.test(n)) {
-      const s = students[mkState.cursor];
-      if (s) { setMark(s.id, 0); Voice.pushLog('did', `${s.name} → Absent (0)`);
-        mkState.cursor = Math.min(students.length - 1, mkState.cursor + 1); focusCursor(true); }
-      return true;
-    }
-    const bare = Voice.parse.wordsToNumber(n);
-    if (bare !== null && bare >= 0 && bare <= maxOf(mkState.term)) {
-      const s = students[mkState.cursor];
-      if (!s) return true;
-      setMark(s.id, bare);
-      Voice.pushLog('did', `${s.name} → ${bare}`);
-      mkState.cursor = Math.min(students.length - 1, mkState.cursor + 1);
-      setTimeout(() => focusCursor(true), 200);
-      return true;
-    }
-    return false;
-  };
 
   subjOptions(); paint();
 };
@@ -1199,13 +1274,22 @@ ROUTES.fees = view => {
   document.getElementById('collectBtn').onclick = () => collectModal();
   paint();
 
-  Voice.attach(view);
-  Voice.onCommand = n => {
-    if (/^(collect fee|new receipt|collect)$/.test(n)) { collectModal(); return true; }
-    const m = n.match(/^(?:search|find)\s+(.+)$/);
-    if (m) { document.getElementById('rcSearch').value = m[1]; paint(m[1].toLowerCase()); return true; }
-    return false;
-  };
+  Agent.screen({
+    screen: 'fees',
+    label: 'Fee Collection',
+    description:
+      'The fee counter: collection totals for the year and the register of every receipt issued. ' +
+      'The receipt register can be searched by student name or receipt number.',
+    role: DEMO_USERS[ROLE].title,
+    routes: agentRoutes(),
+    controls: controlsFrom(document.querySelector('.card-head'), {
+      rcSearch: 'searches the receipt register by student name or receipt number'
+    }),
+    actions: [
+      { id: 'collect_fee', label: 'Open the fee collection form', run: () => collectModal() },
+      { id: 'view_dues', label: 'Show the students with outstanding dues', run: () => location.hash = '#defaulters' }
+    ]
+  });
 };
 
 function collectModal(sid) {
@@ -1213,33 +1297,48 @@ function collectModal(sid) {
   openModal({
     title: '💰 Collect Fee',
     wide: true,
-    body: `<div class="v-banner"><span class="em">🎙</span>
-        <p><strong>Voice enabled.</strong> Say <em>“student Karthik Raja”</em>, <em>“head term fee”</em>,
-        <em>“amount five thousand”</em>, <em>“mode U P I”</em>, then <em>“save”</em>.</p></div>
+    body: `<div class="ag-banner"><span class="em">🎙</span>
+        <p><strong>Dictate the receipt.</strong> <em>“Karthik Raja, term fee, five thousand rupees by U P I”</em>
+        — then <em>“save it”</em>.</p></div>
       <form id="feeForm" class="grid g2" style="gap:1rem" onsubmit="return false">
         <div class="field" style="grid-column:span 2"><label class="req" for="f_stu">Student</label>
-          <select class="select" id="f_stu" data-v="student|student name|name|pupil">
+          <select class="select" id="f_stu">
             <option value="">—</option>
             ${students.slice(0, 400).map(s => `<option value="${s.id}" ${s.id === sid ? 'selected' : ''}>${esc(s.name)} · ${s.cls}-${s.sec} · due ${INR(s.feeTotal - s.feePaid)}</option>`).join('')}
           </select></div>
         <div class="field"><label class="req" for="f_head">Fee Head</label>
-          <select class="select" id="f_head" data-v="head|fee head|towards|for"><option value="">—</option>${optList(FEE_HEADS)}</select></div>
+          <select class="select" id="f_head"><option value="">—</option>${optList(FEE_HEADS)}</select></div>
         <div class="field"><label class="req" for="f_amt">Amount (₹)</label>
-          <input class="input" type="number" id="f_amt" data-v="amount|rupees|sum|fee amount" min="1"></div>
+          <input class="input" type="number" id="f_amt" min="1"></div>
         <div class="field"><label class="req" for="f_mode">Payment Mode</label>
-          <select class="select" id="f_mode" data-v="mode|payment mode|paid by|method"><option value="">—</option>${optList(['Cash','UPI','Net Banking','Cheque','DD'])}</select></div>
+          <select class="select" id="f_mode"><option value="">—</option>${optList(['Cash','UPI','Net Banking','Cheque','DD'])}</select></div>
         <div class="field"><label for="f_date">Date</label>
-          <input class="input" type="date" id="f_date" data-v="date|receipt date" value="${todayISO()}"></div>
+          <input class="input" type="date" id="f_date" value="${todayISO()}"></div>
         <div class="field" style="grid-column:span 2"><label for="f_note">Remarks</label>
-          <input class="input" id="f_note" data-v="remarks|note|comment" placeholder="optional"></div>
+          <input class="input" id="f_note" placeholder="optional"></div>
       </form>`,
     actions: [
-      { label: 'Cancel', cls: 'btn-ghost js-cancel', fn: () => { Voice.stop(); closeModal(); } },
-      { label: '🎙 Guided voice', cls: 'btn-voice', fn: () => Voice.startGuided() },
-      { label: '💾 Save Receipt', cls: 'btn-primary js-save', fn: saveFee }
+      { label: 'Cancel', cls: 'btn-ghost', fn: closeModal },
+      { label: '🎙 Dictate', cls: 'btn-agent', fn: () => Agent.start() },
+      { label: '💾 Save Receipt', cls: 'btn-primary', fn: saveFee }
     ],
-    onOpen: body => Voice.attach(body.querySelector('#feeForm'),
-      { onSave: saveFee, onCancel: () => { Voice.stop(); closeModal(); } })
+    onOpen: body => Agent.screen({
+      screen: 'collect_fee',
+      label: 'Collect Fee',
+      description:
+        'A form for recording a fee payment at the counter. The student dropdown lists everyone with an ' +
+        'outstanding balance — match the spoken name against those option labels.',
+      role: DEMO_USERS[ROLE].title,
+      routes: agentRoutes(),
+      controls: controlsFrom(body.querySelector('#feeForm'), {
+        f_amt: 'rupees, digits only',
+        f_stu: 'each option is "name · class-section · due amount"'
+      }),
+      actions: [
+        { id: 'save_receipt', label: 'Save the receipt', run: saveFee },
+        { id: 'cancel', label: 'Close without saving', run: closeModal }
+      ]
+    })
   });
 
   function saveFee() {
@@ -1248,7 +1347,7 @@ function collectModal(sid) {
     const amt = +g('f_amt');
     if (!s || !amt || !g('f_head') || !g('f_mode')) {
       toast('Student, head, amount and mode are all required.', 'err');
-      Voice.say('Please complete student, head, amount and mode.');
+      Agent.say('Still need the student, the head, the amount and the payment mode.');
       return;
     }
     const no = 'RC' + (2000 + DB.receipts.length);
@@ -1256,9 +1355,9 @@ function collectModal(sid) {
       date: g('f_date') || todayISO(), head: g('f_head'), mode: g('f_mode'), amount: amt });
     s.feePaid += amt;
     DB.save('receipts'); DB.save('students');
-    Voice.stop(); closeModal();
+    closeModal();
     toast(`Receipt ${no} — ${INR(amt)} from ${s.name}.`, 'ok', 4500);
-    if (location.hash.startsWith('#fees')) route(); else if (location.hash.startsWith('#student')) route();
+    Agent.say(`Receipt ${no}. ${INR(amt)} from ${s.name}.`);
   }
 }
 
@@ -1334,38 +1433,55 @@ ROUTES.notices = view => {
   if (!canPost) return;
   document.getElementById('newNotice').onclick = () => openModal({
     title: '📢 New Circular',
-    body: `<div class="v-banner"><span class="em">🎙</span>
-        <p><strong>Dictate it.</strong> Say <em>“title parent teacher meeting”</em>, then
-        <em>“body meeting on Saturday at ten a m”</em>, choose the audience and say <em>“save”</em>.</p></div>
+    body: `<div class="ag-banner"><span class="em">🎙</span>
+        <p><strong>Dictate it.</strong> <em>“Parent teacher meeting for standard ten and twelve on Saturday
+        the ninth at ten a m in the main hall”</em> — the assistant splits that into a title, a message and
+        an audience.</p></div>
       <form id="ntForm" class="grid" style="gap:1rem" onsubmit="return false">
         <div class="field"><label class="req" for="n_title">Title</label>
-          <input class="input" id="n_title" data-v="title|subject|heading|circular title"></div>
+          <input class="input" id="n_title"></div>
         <div class="field"><label class="req" for="n_body">Message</label>
-          <textarea class="textarea" id="n_body" data-v="body|message|content|text|details"></textarea></div>
+          <textarea class="textarea" id="n_body"></textarea></div>
         <div class="grid g2">
           <div class="field"><label for="n_to">Audience</label>
-            <select class="select" id="n_to" data-v="audience|to|send to|recipients">
+            <select class="select" id="n_to">
               ${optList(['All','Parents','Staff','Std X, XII','Std XI, XII','Primary Section'])}</select></div>
           <div class="field"><label for="n_date">Date</label>
-            <input class="input" type="date" id="n_date" data-v="date" value="${todayISO()}"></div>
+            <input class="input" type="date" id="n_date" value="${todayISO()}"></div>
         </div>
       </form>`,
     actions: [
-      { label: 'Cancel', cls: 'btn-ghost js-cancel', fn: () => { Voice.stop(); closeModal(); } },
-      { label: '🎙 Guided voice', cls: 'btn-voice', fn: () => Voice.startGuided() },
-      { label: '📢 Publish', cls: 'btn-primary js-save', fn: publish }
+      { label: 'Cancel', cls: 'btn-ghost', fn: closeModal },
+      { label: '🎙 Dictate', cls: 'btn-agent', fn: () => Agent.start() },
+      { label: '📢 Publish', cls: 'btn-primary', fn: publish }
     ],
-    onOpen: b => Voice.attach(b.querySelector('#ntForm'), { onSave: publish, onCancel: () => { Voice.stop(); closeModal(); } })
+    onOpen: b => Agent.screen({
+      screen: 'new_circular',
+      label: 'New Circular',
+      description:
+        'A form for issuing a circular to parents, students or staff. A dictated announcement should be ' +
+        'split into a short title, the full message, and the audience it is addressed to.',
+      role: DEMO_USERS[ROLE].title,
+      routes: agentRoutes(),
+      controls: controlsFrom(b.querySelector('#ntForm'), {
+        n_title: 'a short headline, not the whole announcement',
+        n_body: 'the full text parents will read'
+      }),
+      actions: [
+        { id: 'publish', label: 'Publish the circular', run: publish },
+        { id: 'cancel', label: 'Close without publishing', run: closeModal }
+      ]
+    })
   });
 
   function publish() {
     const t = document.getElementById('n_title').value.trim();
     const bd = document.getElementById('n_body').value.trim();
-    if (!t || !bd) { toast('Title and message are required.', 'err'); Voice.say('Title and message are required.'); return; }
+    if (!t || !bd) { toast('Title and message are required.', 'err'); Agent.say('Still need a title and a message.'); return; }
     DB.notices.unshift({ id: uid('n'), date: document.getElementById('n_date').value || todayISO(),
       title: t, body: bd, to: document.getElementById('n_to').value, by: DEMO_USERS[ROLE].name });
     DB.save('notices');
-    Voice.stop(); closeModal();
+    closeModal();
     toast('Circular published — SMS queued.', 'ok');
     route();
   }
@@ -1436,17 +1552,22 @@ ROUTES.settings = view => {
           </div></div>
       </div></div>
 
-      <div class="card"><div class="card-head"><h3>🎙 Voice Entry</h3></div><div class="card-body col" style="gap:1rem">
-        <div class="row-between"><span>Recognition language</span>
+      <div class="card"><div class="card-head"><h3>🎙 Voice Assistant</h3><span class="badge badge-voice">Gemini</span></div>
+        <div class="card-body col" style="gap:1rem">
+        <div class="row-between"><span>Speech recognition language</span>
           <select class="select" id="setLang" style="width:auto">
-            <option value="en-IN" ${Voice.lang === 'en-IN' ? 'selected' : ''}>English (India)</option>
-            <option value="ta-IN" ${Voice.lang === 'ta-IN' ? 'selected' : ''}>தமிழ் (Tamil)</option>
+            <option value="en-IN" ${Agent.lang === 'en-IN' ? 'selected' : ''}>English (India)</option>
+            <option value="ta-IN" ${Agent.lang === 'ta-IN' ? 'selected' : ''}>தமிழ் (Tamil)</option>
           </select></div>
-        <div class="row-between"><span>Speak prompts aloud</span>
-          <label class="check"><input type="checkbox" id="setTTS" ${Voice.speakPrompts ? 'checked' : ''}> Enabled</label></div>
-        <div class="row-between"><span>Browser support</span>
-          <span class="badge ${Voice.supported ? 'badge-ok' : 'badge-warn'}">${Voice.supported ? 'Speech recognition available' : 'Not available — typed console'}</span></div>
-        <button class="btn btn-ghost btn-sm" onclick="Voice.showHelp()">📖 Voice command reference</button>
+        <div class="row-between"><span>Read replies aloud</span>
+          <label class="check"><input type="checkbox" id="setTTS" ${Agent.speak ? 'checked' : ''}> Enabled</label></div>
+        <div class="row-between"><span>Microphone</span>
+          <span class="badge ${Agent.supported ? 'badge-ok' : 'badge-warn'}">${Agent.supported ? 'Available in this browser' : 'Unavailable — type instead'}</span></div>
+        <div class="row-between"><span>Assistant</span>
+          <span class="badge" id="setAgentState">checking…</span></div>
+        <p class="tiny muted">The assistant reads the shape of each screen — its buttons and fields — and decides
+        what to operate. Student records are never sent; filtering happens in this browser.</p>
+        <button class="btn btn-ghost btn-sm" onclick="Agent.help()">📖 What can I say?</button>
       </div></div>
 
       <div class="card"><div class="card-head"><h3>School Profile</h3></div><div class="card-body info-grid">
@@ -1473,14 +1594,32 @@ ROUTES.settings = view => {
     document.querySelectorAll('#themeSeg button').forEach(x => x.classList.toggle('on', x === b));
   });
   document.getElementById('setLang').onchange = e => {
-    Voice.lang = e.target.value; Store.set('voiceLang', Voice.lang);
-    if (Voice.rec) Voice.rec.lang = Voice.lang;
-    document.getElementById('vLang').value = Voice.lang;
-    toast('Voice language updated.', 'ok');
+    Agent.lang = e.target.value; Store.set('agentLang', Agent.lang);
+    if (Agent.rec) Agent.rec.lang = Agent.lang;
+    const dockLang = document.getElementById('agLang');
+    if (dockLang) dockLang.value = Agent.lang;
+    toast('Speech recognition language updated.', 'ok');
   };
   document.getElementById('setTTS').onchange = e => {
-    Voice.speakPrompts = e.target.checked; Store.set('voiceTTS', Voice.speakPrompts);
+    Agent.speak = e.target.checked; Store.set('agentTTS', Agent.speak);
   };
+
+  /* Ask the server whether it actually has an API key, rather than guessing. */
+  fetch('/api/agent', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ utterance: 'ping', context: { screen: 'healthcheck' } })
+  }).then(r => {
+    const el = document.getElementById('setAgentState');
+    if (!el) return;
+    if (r.ok) { el.textContent = 'Connected'; el.className = 'badge badge-ok'; }
+    else if (r.status === 503) { el.textContent = 'No API key on the server'; el.className = 'badge badge-warn'; }
+    else { el.textContent = 'Unreachable (HTTP ' + r.status + ')'; el.className = 'badge badge-danger'; }
+  }).catch(() => {
+    const el = document.getElementById('setAgentState');
+    if (el) { el.textContent = 'Not running through serve.js'; el.className = 'badge badge-warn'; }
+  });
+
   document.getElementById('resetBtn').onclick = () => openModal({
     title: 'Reset demo data?',
     body: `<p>This clears every student, mark, receipt and attendance record you have entered and restores the original sample data.</p>`,
@@ -1684,6 +1823,23 @@ ROUTES.insights = view => {
 
   document.getElementById('insSev').onchange = e => { insFilter.sev = e.target.value; paint(); };
   document.getElementById('insCls').onchange = e => { insFilter.cls = e.target.value; paint(); };
+
+  Agent.screen({
+    screen: 'insights',
+    label: 'Attendance Alerts',
+    description:
+      'Students whose day-by-day attendance shows a worrying pattern, ranked by risk, each with the ' +
+      'evidence behind the flag. Filter by how severe the pattern is and by standard.',
+    role: DEMO_USERS[ROLE].title,
+    routes: agentRoutes(),
+    controls: controlsFrom(document.querySelector('.toolbar'), {
+      insSev: 'how serious a pattern has to be to appear',
+      insCls: 'Roman numeral I to XII'
+    }),
+    actions: [
+      { id: 'export_actions', label: 'Export the action list', run: () => document.getElementById('insExport').click() }
+    ]
+  });
   document.getElementById('insExport').onclick = () => {
     const rows = [['Admission','Name','Class','Section','Roll','Guardian','Phone','Attendance %','Risk','Band','Patterns','Forecast']];
     all.forEach(r => rows.push([r.student.adm, r.student.name, r.student.cls, r.student.sec, r.student.roll,
@@ -1864,6 +2020,22 @@ ROUTES.scholarships = view => {
     });
   });
 
+  Agent.screen({
+    screen: 'scholarships',
+    label: 'Scholarship Match',
+    description:
+      'Which students qualify for which Tamil Nadu and Government of India scholarship schemes, with the ' +
+      'criteria each one passed or failed. Pick a student from the dropdown to see their full entitlement.',
+    role: DEMO_USERS[ROLE].title,
+    routes: agentRoutes(),
+    controls: controlsFrom(document.querySelector('.toolbar'), {
+      schStudent: 'each option is "name · class-section · roll"'
+    }),
+    actions: [
+      { id: 'export_claims', label: 'Export the claim list', run: () => document.getElementById('schExport').click() }
+    ]
+  });
+
   document.getElementById('schStudent').onchange = e => {
     const host = document.getElementById('schOne');
     if (!e.target.value) { host.innerHTML = ''; return; }
@@ -1931,11 +2103,11 @@ function downloadCSV(rows, filename) {
 
 /* ═══════════════════════════ boot ═══════════════════════════ */
 paintNav();
-Voice.init();
+Agent.init();
 addEventListener('hashchange', route);
 
 document.getElementById('logoutBtn').onclick = () => { Store.del('session'); location.href = 'index.html'; };
-document.getElementById('voiceHelpTop').onclick = () => Voice.showHelp();
+document.getElementById('voiceHelpTop').onclick = () => Agent.help();
 document.getElementById('sideToggle').onclick = () => {
   const side = document.getElementById('appSide');
   side.classList.add('open');
@@ -1954,9 +2126,9 @@ document.getElementById('globalSearch').oninput = e => {
 
 route();
 setTimeout(() => {
-  if (!Store.get('seenVoiceTip')) {
-    Store.set('seenVoiceTip', true);
-    toast('🎙 Voice entry is ready — press Ctrl+Shift+M any time.', 'voice', 6000);
-    document.getElementById('voiceDock')?.classList.add('open');
+  if (!Store.get('seenAgentTip')) {
+    Store.set('seenAgentTip', true);
+    toast('🎙 Talk to the assistant — press Ctrl+Shift+V any time.', 'voice', 6000);
+    document.getElementById('agentDock')?.classList.add('open');
   }
 }, 900);
