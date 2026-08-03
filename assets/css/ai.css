@@ -1,0 +1,261 @@
+/* ============================================================
+   ai.css — visual language for the intelligence layer
+   ------------------------------------------------------------
+   AI surfaces get their own identity so a user always knows when
+   they are looking at something inferred rather than recorded:
+     · aurora gradient (cyan → violet → magenta)
+     · a slow breathing glow on live panels
+     · a blinking beacon reserved for items needing action today
+
+   Every animation here is switched off by the global
+   prefers-reduced-motion rule in base.css.
+   ============================================================ */
+
+:root {
+  --ai-1: #00c2d1;   /* cyan   */
+  --ai-2: #7c4dff;   /* violet */
+  --ai-3: #ff4d9d;   /* magenta*/
+  --ai-grad: linear-gradient(115deg, var(--ai-1), var(--ai-2) 52%, var(--ai-3));
+  --ai-soft: color-mix(in srgb, var(--ai-2) 12%, transparent);
+}
+
+/* ---------- The AI chip ---------- */
+.ai-chip {
+  display: inline-flex; align-items: center; gap: .32rem;
+  padding: .14rem .5rem .14rem .38rem;
+  border-radius: var(--r-pill);
+  font-family: var(--font-display); font-size: .66rem; font-weight: 800;
+  letter-spacing: .09em; text-transform: uppercase;
+  color: #fff; background: var(--ai-grad);
+  box-shadow: 0 2px 8px rgba(124, 77, 255, .38);
+  white-space: nowrap; line-height: 1.6;
+}
+.ai-chip .spark { font-size: .78em; animation: aiSpark 2.6s ease-in-out infinite; }
+@keyframes aiSpark { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .55; transform: scale(.86); } }
+
+.ai-chip-ghost {
+  background: var(--ai-soft); color: var(--ai-2);
+  box-shadow: none; border: 1px solid color-mix(in srgb, var(--ai-2) 35%, transparent);
+}
+:root[data-theme="dark"] .ai-chip-ghost { color: #b79bff; }
+
+/* ---------- Blinking beacon — reserved for "act today" ---------- */
+.beacon {
+  position: relative; display: inline-block; flex: none;
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--rose-500);
+  box-shadow: 0 0 0 0 rgba(214, 56, 100, .7);
+  animation: beaconBlink 1.5s ease-in-out infinite, beaconRing 1.5s ease-out infinite;
+}
+.beacon-warn { background: var(--saffron-500); box-shadow: 0 0 0 0 rgba(232, 155, 18, .7); }
+.beacon-ok   { background: var(--teal-500);    box-shadow: 0 0 0 0 rgba(15, 138, 126, .7); }
+.beacon-ai   { background: var(--ai-2);        box-shadow: 0 0 0 0 rgba(124, 77, 255, .7); }
+@keyframes beaconBlink { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+@keyframes beaconRing {
+  0%   { box-shadow: 0 0 0 0 currentColor; }
+  70%  { box-shadow: 0 0 0 9px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.beacon-warn { color: rgba(232, 155, 18, .55); }
+.beacon      { color: rgba(214, 56, 100, .55); }
+.beacon-ok   { color: rgba(15, 138, 126, .55); }
+.beacon-ai   { color: rgba(124, 77, 255, .55); }
+
+/* ---------- The dashboard AI band ---------- */
+.ai-band {
+  position: relative; margin-bottom: 1.3rem;
+  border-radius: var(--r-lg); padding: 1px;      /* the 1px is the gradient border */
+  background: var(--ai-grad);
+  background-size: 220% 220%;
+  animation: aiFlow 9s ease infinite;
+  box-shadow: 0 8px 30px -10px rgba(124, 77, 255, .45);
+}
+@keyframes aiFlow {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+.ai-band-inner {
+  background: var(--surface); border-radius: calc(var(--r-lg) - 1px);
+  padding: 1.15rem 1.3rem;
+  position: relative; overflow: hidden;
+}
+.ai-band-inner::before {          /* slow breathing wash */
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(620px 200px at 12% 0%, rgba(124, 77, 255, .10), transparent 62%),
+              radial-gradient(520px 220px at 92% 110%, rgba(0, 194, 209, .10), transparent 60%);
+  animation: aiBreathe 7s ease-in-out infinite;
+}
+@keyframes aiBreathe { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+.ai-band-head { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-bottom: 1rem; position: relative; }
+.ai-band-head h3 { font-size: 1.05rem; margin: 0; }
+.ai-band-head .sub { font-size: .78rem; color: var(--text-mute); }
+
+/* ---------- AI insight cards inside the band ---------- */
+.ai-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: .9rem; position: relative; }
+@media (max-width: 900px) { .ai-cards { grid-template-columns: 1fr; } }
+
+.ai-card {
+  display: block; width: 100%; text-align: left;
+  background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: var(--r-md); padding: 1rem 1.1rem;
+  transition: transform var(--t) var(--ease), box-shadow var(--t) var(--ease), border-color var(--t) var(--ease);
+  position: relative; overflow: hidden; text-decoration: none; color: inherit;
+}
+.ai-card::after {                 /* light sweep on hover */
+  content: ''; position: absolute; top: 0; bottom: 0; width: 40%;
+  left: -50%; transform: skewX(-18deg);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .16), transparent);
+  transition: left .55s var(--ease);
+}
+.ai-card:hover {
+  transform: translateY(-3px); text-decoration: none;
+  box-shadow: 0 12px 28px -12px rgba(124, 77, 255, .5);
+  border-color: color-mix(in srgb, var(--ai-2) 45%, transparent);
+}
+.ai-card:hover::after { left: 120%; }
+
+.ai-card-top { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .55rem; }
+.ai-card-top .label {
+  font-size: .72rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--text-mute);
+  display: flex; align-items: center; gap: .4rem;
+}
+.ai-card .ico {
+  width: 30px; height: 30px; border-radius: var(--r-xs); display: grid; place-items: center;
+  font-size: .95rem; background: var(--ai-soft);
+}
+.ai-card b.figure {
+  font-family: var(--font-display); font-size: 1.85rem; font-weight: 740;
+  letter-spacing: -.03em; line-height: 1.05; display: block;
+  background: var(--ai-grad); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.ai-card .caption { font-size: .78rem; color: var(--text-soft); margin-top: .28rem; line-height: 1.45; }
+.ai-card .go { font-size: .74rem; font-weight: 650; color: var(--ai-2); margin-top: .6rem; display: inline-block; }
+:root[data-theme="dark"] .ai-card .go { color: #b79bff; }
+
+/* urgent variant — the blinking cue */
+.ai-card.urgent { border-color: color-mix(in srgb, var(--rose-500) 45%, transparent); }
+.ai-card.urgent::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: var(--rose-500);
+  animation: urgentPulse 1.6s ease-in-out infinite;
+}
+@keyframes urgentPulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+
+/* ---------- Nav item AI marker ---------- */
+.nav-item .tag.ai {
+  background: var(--ai-grad); color: #fff;
+  box-shadow: 0 0 10px rgba(124, 77, 255, .55);
+  animation: navGlow 3s ease-in-out infinite;
+}
+@keyframes navGlow {
+  0%, 100% { box-shadow: 0 0 8px rgba(124, 77, 255, .45); }
+  50%      { box-shadow: 0 0 15px rgba(124, 77, 255, .85); }
+}
+
+/* ---------- Page header for AI screens ---------- */
+.ai-hero {
+  border-radius: var(--r-lg); padding: 1px; margin-bottom: 1.3rem;
+  background: var(--ai-grad); background-size: 220% 220%; animation: aiFlow 9s ease infinite;
+}
+.ai-hero-inner {
+  background: var(--surface); border-radius: calc(var(--r-lg) - 1px);
+  padding: 1.3rem 1.4rem; position: relative; overflow: hidden;
+}
+.ai-hero-inner::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(700px 220px at 8% 0%, rgba(124, 77, 255, .11), transparent 60%);
+}
+.ai-hero h1 { font-size: 1.5rem; margin: .35rem 0 .3rem; }
+.ai-hero p { font-size: .88rem; color: var(--text-soft); max-width: 74ch; }
+.ai-hero .row { position: relative; }
+
+/* ---------- Explainability block ---------- */
+.why {
+  border-left: 3px solid var(--ai-2);
+  background: var(--ai-soft);
+  padding: .6rem .8rem; border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  font-size: .82rem; color: var(--text-soft); line-height: 1.5;
+}
+.why b { color: var(--text); }
+.why + .why { margin-top: .45rem; }
+
+/* ---------- Severity chips ---------- */
+.sev { display: inline-flex; align-items: center; gap: .3rem; padding: .12rem .5rem;
+  border-radius: var(--r-pill); font-size: .68rem; font-weight: 750; font-family: var(--font-display);
+  text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+.sev-critical { background: var(--rose-100); color: var(--rose-600); }
+.sev-high     { background: #ffe6d5; color: #b4470c; }
+.sev-medium   { background: var(--saffron-100); color: var(--saffron-600); }
+.sev-low      { background: var(--navy-100); color: var(--navy-700); }
+.sev-blocker  { background: var(--rose-100); color: var(--rose-600); }
+.sev-warning  { background: var(--saffron-100); color: var(--saffron-600); }
+.sev-info     { background: var(--surface-3); color: var(--text-mute); }
+:root[data-theme="dark"] .sev-critical, :root[data-theme="dark"] .sev-blocker { color: #ff8fab; }
+:root[data-theme="dark"] .sev-high { background: #3a2113; color: #ffab7a; }
+:root[data-theme="dark"] .sev-medium, :root[data-theme="dark"] .sev-warning { color: var(--saffron-400); }
+:root[data-theme="dark"] .sev-low { color: var(--navy-300); }
+
+/* ---------- Risk meter ---------- */
+.risk-bar { height: 6px; border-radius: var(--r-pill); background: var(--surface-3); overflow: hidden; min-width: 60px; }
+.risk-bar > i { display: block; height: 100%; border-radius: var(--r-pill); transition: width var(--t-slow) var(--ease-out); }
+.risk-critical > i { background: linear-gradient(90deg, var(--rose-500), #ff7a9c); }
+.risk-high > i     { background: linear-gradient(90deg, #d9600e, #ff9d5c); }
+.risk-medium > i   { background: linear-gradient(90deg, var(--saffron-600), var(--saffron-400)); }
+.risk-low > i      { background: linear-gradient(90deg, var(--teal-600), #4fd6c4); }
+
+/* ---------- Data-health gauge ---------- */
+.gauge { position: relative; width: 168px; height: 168px; margin: 0 auto; display: grid; place-items: center; }
+.gauge svg { transform: rotate(-90deg); }
+.gauge .val { position: absolute; text-align: center; }
+.gauge .val b { display: block; font-family: var(--font-display); font-size: 2.3rem; font-weight: 780; line-height: 1; letter-spacing: -.03em; }
+.gauge .val span { font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text-mute); font-weight: 650; }
+
+/* ---------- Attendance sparkline strip ---------- */
+.att-strip { display: flex; gap: 1.5px; align-items: stretch; height: 26px; border-radius: 4px; overflow: hidden; }
+.att-strip i { flex: 1; min-width: 1.5px; border-radius: 1px; }
+.att-strip i.p { background: var(--teal-500); }
+.att-strip i.l { background: var(--saffron-400); }
+.att-strip i.a { background: var(--rose-500); }
+:root[data-theme="dark"] .att-strip i.p { background: #2fa094; }
+
+/* ---------- Scheme card ---------- */
+.scheme {
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--surface); overflow: hidden;
+  transition: box-shadow var(--t) var(--ease), border-color var(--t) var(--ease);
+}
+.scheme:hover { box-shadow: var(--sh-2); border-color: color-mix(in srgb, var(--ai-2) 35%, transparent); }
+.scheme-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: .95rem 1.1rem; border-bottom: 1px solid var(--line); }
+.scheme-head h4 { font-size: .96rem; margin-bottom: .12rem; }
+.scheme-head .auth { font-size: .72rem; color: var(--text-mute); }
+.scheme-amt { text-align: right; flex: none; }
+.scheme-amt b { display: block; font-family: var(--font-display); font-size: 1.15rem; font-weight: 730; color: var(--teal-600); letter-spacing: -.02em; }
+.scheme-amt span { font-size: .66rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: .05em; }
+:root[data-theme="dark"] .scheme-amt b { color: #5fd3c4; }
+.scheme-body { padding: .9rem 1.1rem; }
+.crit-list { display: flex; flex-direction: column; gap: .3rem; }
+.crit { display: flex; align-items: flex-start; gap: .45rem; font-size: .81rem; }
+.crit.ok { color: var(--text-soft); }
+.crit.no { color: var(--text-mute); }
+.crit .mk { flex: none; font-weight: 700; width: 14px; }
+.crit.ok .mk { color: var(--teal-500); }
+.crit.no .mk { color: var(--rose-500); }
+
+/* ---------- Empty / all-clear ---------- */
+.all-clear {
+  text-align: center; padding: 2.6rem 1.5rem;
+  border: 1px dashed var(--teal-500); border-radius: var(--r-md);
+  background: var(--teal-100); color: var(--teal-600);
+}
+:root[data-theme="dark"] .all-clear { color: #5fd3c4; background: transparent; }
+.all-clear .ico { font-size: 2.4rem; margin-bottom: .5rem; }
+
+/* ---------- Disclosure footer on every AI screen ---------- */
+.ai-note {
+  margin-top: 1.6rem; padding: .85rem 1.1rem;
+  border: 1px solid var(--line); border-left: 3px solid var(--ai-2);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  background: var(--surface); font-size: .78rem; color: var(--text-mute); line-height: 1.6;
+}
+.ai-note strong { color: var(--text-soft); }

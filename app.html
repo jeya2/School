@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portal — New Gen Higher Secondary School</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Noto+Sans+Tamil:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/base.css">
+<link rel="stylesheet" href="assets/css/app.css">
+<link rel="stylesheet" href="assets/css/voice.css">
+<link rel="stylesheet" href="assets/css/ai.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%231f3480'/><text y='68' x='50' text-anchor='middle' font-size='52' font-family='sans-serif' font-weight='bold' fill='%23f5b533'>NG</text></svg>">
+</head>
+<body class="app">
+
+<aside class="app-side" id="appSide">
+  <div class="side-head">
+    <div class="crest">NG</div>
+    <div class="brand-txt">
+      <span class="brand-name">New Gen Hr. Sec.</span>
+      <span class="brand-sub" id="sideYear">Academic Year 2026–27</span>
+    </div>
+  </div>
+  <nav class="side-scroll" id="sideNav"></nav>
+  <div class="side-foot">
+    <div class="side-user">
+      <div class="avatar" id="userAvatar">?</div>
+      <div style="min-width:0;flex:1">
+        <b id="userName">—</b>
+        <span id="userRole">—</span>
+      </div>
+      <button class="btn btn-quiet btn-icon" id="logoutBtn" title="Sign out" style="color:rgba(255,255,255,.6)">⏻</button>
+    </div>
+  </div>
+</aside>
+
+<div class="app-main" id="appMain">
+  <header class="app-top">
+    <button class="btn btn-quiet btn-icon side-toggle" id="sideToggle" aria-label="Menu">☰</button>
+    <div>
+      <h2 id="pageTitle">Dashboard</h2>
+      <div class="crumb" id="pageCrumb">New Gen Higher Secondary School</div>
+    </div>
+    <div class="searchbox">
+      <input class="input" id="globalSearch" placeholder="Search students by name, admission no…">
+    </div>
+    <button class="btn btn-quiet btn-icon" id="themeBtn" title="Theme">🌙</button>
+    <button class="btn btn-voice btn-sm" id="voiceHelpTop">🎙 Voice</button>
+  </header>
+
+  <main class="view" id="view"></main>
+</div>
+
+<div id="modalHost"></div>
+<div id="toasts"></div>
+
+<script src="assets/js/core.js"></script>
+<script src="assets/js/voice.js"></script>
+<script src="assets/js/ai.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>
