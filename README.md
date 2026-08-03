@@ -274,3 +274,47 @@ income ceilings and near-miss classification.
   toast rather than calling a real service.
 - This is a demonstration build, not a production deployment: no backend, no
   authentication, no audit trail, no encryption.
+
+---
+
+## Licence
+
+Released under the [MIT Licence](LICENSE) — use it, modify it, deploy it, sell it,
+with or without attribution beyond keeping the copyright notice. Chosen because a
+school or district that wants to adapt this should not have to consult a lawyer
+first, and because it imposes nothing on whatever you build next.
+
+**The warranty disclaimer is not a compliance shield.** MIT says the software comes
+with no warranty; it says nothing about your obligations if you run it with real
+children's records. Before this touches a single actual student, the deployer — not
+the author — is responsible for:
+
+- **Verifiable parental consent** and the rest of the DPDP Act 2023 / DPDP Rules 2025
+  regime, whose substantive obligations bite on **13 May 2027**. Every student here is
+  a child under that Act, and children's-data breaches sit in the highest penalty band.
+- A **real backend with authentication**, encryption at rest and in transit, and an
+  audit trail. This build has none of those, by design — it stores everything in
+  `localStorage` so it can be demonstrated by opening a page.
+- **Bias review of the intelligence layer.** A model fitted to historical attendance
+  will happily learn which communities drop out and then help make that true. The
+  engines here are deliberately transparent and rule-based so their reasoning can be
+  argued with, but that is a starting point, not a clearance.
+
+### Third-party assets
+
+No third-party code is bundled — the application has no dependencies. The three
+typefaces (Outfit, Inter, Noto Sans Tamil) are loaded at runtime from Google Fonts
+and are each licensed under the SIL Open Font License; they are linked, not
+redistributed, so nothing in this repository carries their terms. Remove the
+`<link>` tags in `index.html` and `app.html` to run fully offline — the CSS falls
+back to system fonts.
+
+### If MIT is not what you want
+
+- **Apache-2.0** — same permissions, plus an explicit patent grant and a trademark
+  clause. Worth switching to if this becomes a named product, or if an institution's
+  procurement team asks for it.
+- **AGPL-3.0** — the copyleft option common in school ERPs (Gibbon, openSIS, Moodle
+  all use GPL-family licences). Forces anyone offering a modified version as a hosted
+  service to publish their changes. Choose it if keeping downstream improvements open
+  matters more than commercial flexibility.
