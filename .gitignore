@@ -1,0 +1,46 @@
+# ── Dependencies ────────────────────────────────────────────
+# The application itself is dependency-free and needs no build step.
+# These only appear if someone runs npm install for tooling.
+node_modules/
+package-lock.json
+yarn.lock
+npm-debug.log*
+yarn-error.log*
+.npm/
+
+# ── Environment & secrets ───────────────────────────────────
+# Nothing here needs an API key today. When the AI layer moves to a
+# hosted model, the key belongs in a server-side .env — never in the
+# client-side JavaScript this repo ships.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ── Editor & tooling ────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Claude Code per-user overrides. Shared project settings
+# (.claude/settings.json) may be committed; local ones must not.
+.claude/settings.local.json
+
+# ── OS artefacts ────────────────────────────────────────────
+# This project lives in a OneDrive folder, so desktop.ini and Office
+# lock files turn up regularly.
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+~$*
+*.tmp
+
+# ── Logs & local output ─────────────────────────────────────
+*.log
+logs/
+coverage/
+.nyc_output/
