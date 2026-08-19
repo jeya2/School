@@ -1,11 +1,16 @@
 /* ============================================================
    Tests for the three on-device intelligence engines.
    No dependencies — run with:   node tests/ai.test.js
-   ============================================================ */
-const fs = require('fs');
-const path = require('path');
 
-/* Minimal browser surface for core.js + ai.js */
+   The engines run in the browser against whatever the school database
+   handed the page, so the harness builds that state directly: the demo
+   school from server/demo.js is loaded into DB exactly as DB.load()
+   would after an /api/bootstrap call. No server and no network.
+   ============================================================ */
+const fs = require("fs");
+const path = require("path");
+
+/* Minimal browser surface for domain.js + core.js + ai.js */
 const mem = {};
 global.window = {};
 global.localStorage = {
@@ -15,21 +20,38 @@ global.localStorage = {
 };
 global.document = { addEventListener() {}, documentElement: { dataset: {} }, querySelectorAll: () => [] };
 global.addEventListener = () => {};
-Object.keys(mem).length;
+global.fetch = () => { throw new Error("the engines must not reach the network"); };
 
-const load = f => fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', f), 'utf8');
-const api = eval(load('core.js') + '\n;\n' + load('ai.js') +
-  ';({ DB, AI, CLASSES, WORKING_DAYS, YEAR_WORKING_DAYS, MIN_ATTENDANCE, age })');
-const { DB, AI, CLASSES, WORKING_DAYS, YEAR_WORKING_DAYS } = api;
+const load = f => fs.readFileSync(path.join(__dirname, "..", "assets", "js", f), "utf8");
+const sandbox = eval(load("domain.js") + ";\n" + load("core.js") + ";\n" + load("ai.js") +
+  ";({ DB, AI, CLASSES, WORKING_DAYS, YEAR_WORKING_DAYS, MIN_ATTENDANCE, age, applyCalendar })");
+const { DB, AI, CLASSES, YEAR_WORKING_DAYS } = sandbox;
 
-DB.load();
+/* The same bundle a fresh deployment imports. */
+const bundle = require("../server/demo.js").generate();
 
-let pass = 0, fail = 0;
-function ok(label, cond, extra = '') {
-  cond ? pass++ : fail++;
-  console.log(`${cond ? 'PASS' : 'FAIL'}  ${label}${extra ? '   ' + extra : ''}`);
-}
-const section = t => console.log(`\n── ${t} ──`);
+;(async () => {
+  /* Hydrate exactly as DB.load() would after an /api/bootstrap call. */
+  Object.assign(DB, {
+    students: bundle.students, marks: bundle.marks, receipts: bundle.receipts,
+    notices: bundle.notices, staff: bundle.staff, attendance: bundle.attendance,
+    attHistory: bundle.attHistory, attDays: bundle.attDays, applications: bundle.applications,
+    loaded: true
+  });
+  sandbox.applyCalendar({
+    yearStart: bundle.school.yearStart,
+    yearWorkingDays: bundle.school.yearWorkingDays,
+    minAttendance: bundle.school.minAttendance,
+    workingDays: bundle.attDays
+  });
+  const WORKING_DAYS = bundle.attDays;
+
+  let pass = 0, fail = 0;
+  function ok(label, cond, extra = '') {
+    cond ? pass++ : fail++;
+    console.log(`${cond ? 'PASS' : 'FAIL'}  ${label}${extra ? '   ' + extra : ''}`);
+  }
+  const section = t => console.log(`\n── ${t} ──`);
 
 /* ══════════════ seed integrity ══════════════ */
 section('seed data');
@@ -234,3 +256,4 @@ ok('summary numbers are finite',
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);
+})();

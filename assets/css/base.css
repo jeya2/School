@@ -61,7 +61,6 @@
   --ok: var(--teal-500);
   --warn: var(--saffron-600);
   --danger: var(--rose-500);
-  --voice: var(--violet-500);
 
   /* Shape & depth */
   --r-xs: 6px;
@@ -208,7 +207,6 @@ h4 { font-size: 1.02rem; }
 .btn-primary { background: linear-gradient(135deg, var(--navy-700), var(--navy-600)); color: #fff; box-shadow: var(--sh-2); }
 .btn-primary:hover { box-shadow: var(--sh-3); }
 .btn-accent { background: linear-gradient(135deg, var(--saffron-500), var(--saffron-400)); color: var(--navy-900); box-shadow: var(--sh-2); }
-.btn-voice { background: linear-gradient(135deg, var(--violet-600), var(--violet-500)); color: #fff; box-shadow: var(--sh-2); }
 .btn-ok { background: var(--teal-500); color: #fff; }
 .btn-danger { background: var(--rose-500); color: #fff; }
 .btn-ghost { background: transparent; border-color: var(--line-strong); color: var(--text-soft); }
@@ -251,12 +249,12 @@ h4 { font-size: 1.02rem; }
 .badge-ok { background: var(--teal-100); color: var(--teal-600); }
 .badge-warn { background: var(--saffron-100); color: var(--saffron-600); }
 .badge-danger { background: var(--rose-100); color: var(--rose-600); }
-.badge-voice { background: var(--violet-100); color: var(--violet-600); }
+.badge-accent { background: var(--violet-100); color: var(--violet-600); }
 :root[data-theme="dark"] .badge-brand { color: var(--navy-300); }
 :root[data-theme="dark"] .badge-ok { color: #5fd3c4; }
 :root[data-theme="dark"] .badge-warn { color: var(--saffron-400); }
 :root[data-theme="dark"] .badge-danger { color: #ff8fab; }
-:root[data-theme="dark"] .badge-voice { color: #b79bff; }
+:root[data-theme="dark"] .badge-accent { color: #b79bff; }
 
 .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; }
 
@@ -366,7 +364,6 @@ h4 { font-size: 1.02rem; }
 .toast.ok { border-left-color: var(--teal-500); }
 .toast.warn { border-left-color: var(--saffron-500); }
 .toast.err { border-left-color: var(--rose-500); }
-.toast.voice { border-left-color: var(--violet-500); }
 .toast.out { animation: toastOut .25s var(--ease) forwards; }
 @keyframes toastIn { from { opacity: 0; transform: translateX(24px) scale(.96); } to { opacity: 1; transform: none; } }
 @keyframes toastOut { to { opacity: 0; transform: translateX(24px) scale(.96); } }
@@ -412,7 +409,7 @@ h4 { font-size: 1.02rem; }
 
 /* ---------- Print ---------- */
 @media print {
-  .no-print, .app-side, .app-top, #voiceDock, #toasts { display: none !important; }
+  .no-print, .app-side, .app-top, #toasts { display: none !important; }
   body { background: #fff; }
   .app-main { margin: 0 !important; padding: 0 !important; }
   .card { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }

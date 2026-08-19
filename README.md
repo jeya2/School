@@ -1,236 +1,194 @@
-# New Gen Higher Secondary School — Student Management Portal
+# School Management Portal
 
-A demonstration student-management application for a Tamil Nadu higher secondary
-school, built around one distinguishing idea: **you talk to it.** Not memorised
-commands — you say what you want, and a Gemini-powered agent reads whatever screen
-you are on and works out which buttons, filters and fields to operate.
+A database-driven student management system for schools, built to be deployed
+once per school. The application ships with no school in it: a school hands over
+its data in a single JSON file, an administrator loads that file through the
+admin UI, and the deployment becomes that school's portal — its name, its roll,
+its staff, its accounts.
 
-Hypothetical school: **NEW GEN HIGHER SECONDARY SCHOOL**, Perundurai Road, Erode –
-638 011. Tamil Nadu State Board, Std I–XII, Tamil and English medium.
+Modelled on Tamil Nadu state-board practice throughout: EMIS and UDISE pupil IDs,
+community categories (OC/BC/BCM/MBC/SC/ST), RTE 25% seats, Std XI–XII group
+choice, quarterly / half-yearly / annual terms, and public-exam eligibility at
+75% attendance.
 
----
-
-## Running it
-
-```
-npm install                    # once — installs the Google GenAI SDK for the server
-cp .env.example .env           # PowerShell: Copy-Item .env.example .env
-                               # then edit .env and paste your key
-node serve.js                  # → http://localhost:5490
-```
-
-Then open **http://localhost:5490** in **Chrome or Edge** and allow the microphone.
-
-The server prints which state it is in on the first line:
-
-```
-Voice agent : ready — gemini-3.5-flash-lite
-Voice agent : DISABLED — put GEMINI_API_KEY in .env and restart
-```
-
-### Getting a free Gemini API key
-
-The voice agent runs on **Google Gemini's free tier** — no credit card, no expiry.
-
-1. Go to **[aistudio.google.com/apikey](https://aistudio.google.com/apikey)**
-2. Sign in with any Google account
-3. Click **Create API key**
-4. Pick a project when asked, or let it create one
-5. **Copy the key** — it starts `AIza…`
-6. Paste it into `.env` as `GEMINI_API_KEY=AIza…`, then restart the server
-
-That is the whole process; there is no billing step. The free tier allows roughly
-**1,000–1,500 requests a day and 15 a minute** on Flash-Lite, which comfortably
-covers a school this size.
-
-Two things worth knowing:
-
-- **Free-tier inputs may be used to improve Google's models.** For this app the
-  exposure is minimal by construction — the payload contains no student data at all,
-  only screen structure (see [What is sent to the API](#what-is-sent-to-the-api)).
-  Enabling billing on the same key removes the clause.
-- **Quota resets** per-minute after a minute, and daily at midnight US Pacific.
-  When you hit it the assistant says so out loud and stops listening rather than
-  firing doomed requests.
-
-An environment variable works too and takes precedence over `.env`:
-
-```powershell
-$env:GEMINI_API_KEY = "AIza..."   # this window only
-```
-
-The catch is that it has to be set in the **same shell** you start the server from,
-and on Windows it is gone when that window closes. `.env` avoids both problems.
-
-### Using a different provider
-
-`server/agent.js` is the only file that talks to a model. The prompt, the four-tool
-contract and the screen-manifest format are provider-neutral, and `tests/agent.test.js`
-mocks the client — so swapping to Claude, Groq, or a local Ollama model is a change to
-one file with the test suite still applying.
-
-Three things that will bite you if skipped:
-
-- **Serve it over `http://localhost`. Do not double-click `index.html`.** Chrome
-  refuses microphone access on a `file://` origin, so the agent is deaf there.
-- **The API key must be set before you start the server.** It is read from the
-  environment at startup. Without it the app still runs — every screen works by
-  keyboard — but the assistant returns a clear "no API key" message instead of
-  acting. The server prints which state it is in on boot.
-- **Chrome or Edge.** They ship the Web Speech API used to turn speech into text.
-  Elsewhere the dock falls back to a typed box that goes through the identical
-  agent, so nothing is unreachable — you type what you would have said.
-
-### Where the API key lives
-
-Server-side, always. `serve.js` proxies `POST /api/agent`; the browser never sees
-the key. A static page cannot hold one safely — view-source is all it takes. The
-`server/`, `node_modules/` and `tests/` directories are refused over HTTP for the
-same reason.
-
-All student data lives in `localStorage` and stays in the browser — see
-[What is sent to the API](#what-is-sent-to-the-api).
-
-### Signing in
-
-Pick any role on the login screen — the user ID is prefilled and **any password
-works**. The role you choose changes the navigation and the dashboard:
-
-| Role | Sees |
-|---|---|
-| Admin / Principal | Everything |
-| Teacher | Students, attendance, mark entry, report cards, circulars |
-| Accountant | Students, fee collection, dues |
-| Parent / Student | Own record: attendance, marks, fees, circulars |
+The part that earns its keep is the [intelligence layer](#-intelligence-layer):
+three rule-based engines that read a school's own records and surface the
+children at risk of losing exam eligibility, the records that will get a
+government return rejected, and the scholarship money families are entitled to
+and never claim. All three run in the browser, over data that never leaves it.
 
 ---
 
-## 🎙 The voice assistant
+## One deployment, one school
 
-Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> anywhere and say what you want.
-There is no command list to learn — the assistant is given the current screen and
-decides which of its controls to operate.
-
-```
-"Can you open the portal"                                  → opens the login
-"Show me attendance alerts"                                → navigates there
-"Which class ten students are absent today?"               → sets two filters, shows the result
-"Karthik Raja, father Murugesan, born twelfth March two    → fills eleven fields
- thousand ten, M B C, Tamil medium, standard ten A"
-"Roll twelve is absent"                                    → marks that student
-"Mark everyone present, then save the register"            → two actions in one breath
-"What can I do on this screen?"                            → answers out loud
-```
-
-### How it works
+There is no tenant column anywhere in the schema, deliberately. Each school gets
+its own deployment and its own database, so a query can never cross from one
+school's children to another's, and a school's data can be handed back or
+destroyed by deleting one database.
 
 ```
-speech  →  Web Speech API  →  text
-                                │
-                                ├─ + a manifest of THIS screen: its routes,
-                                │    buttons, fields and filter options
-                                ▼
-                    POST /api/agent  (serve.js — holds the API key)
-                                ▼
-                        Gemini, four tools:
-                        navigate · click · set_controls · respond
-                                ▼
-                       tool calls returned to the browser
-                                ▼
-                    the browser executes them on the real page
+   school's JSON file  ──▶  admin UI (or CLI)  ──▶  one deployment  ──▶  that school's portal
 ```
-
-Every screen registers what it can do:
-
-```js
-Agent.screen({
-  screen: 'attendance',
-  description: 'The daily attendance register for one standard, section and date…',
-  routes:   agentRoutes(),
-  controls: controlsFrom(document.querySelector('.toolbar')),
-  actions: [
-    { id: 'mark_all_present', label: 'Mark the whole class present', run: …  },
-    { id: 'mark_student',     label: 'Mark one student by roll number',
-      arg: 'the roll number and the status, e.g. "12 absent"',      run: … }
-  ]
-});
-```
-
-Adding a new voice capability means adding an entry to that manifest. There is no
-grammar to extend and no parser to teach.
-
-### What is sent to the API
-
-**The shape of the screen, and what you said. Never student records.**
-
-Asked *"which class ten students are absent today"*, the model does not receive the
-roll. It receives "there is a Standard filter with options I…XII and a Showing filter
-with options absent/present/late", replies `set_controls: class=X, showing=absent`,
-and the **browser** filters its own local data.
-
-This is not an optimisation. Under India's DPDP Act 2023 every student here is a
-child, and sending identifiable child data to a third-party API without verifiable
-parental consent is the most expensive mistake a school can make. The manifest
-boundary is what keeps that from being possible — `tests/agent.test.js` asserts that
-no seeded name, admission number, phone or Aadhaar can appear in the request payload.
-
-### The decision cache
-
-In a roll call the same sentences repeat all day — *"mark all present"*, *"save the
-register"*, *"roll twelve absent"*. Each one used to be a fresh API call re-deciding
-something already decided, which on a ~1,000-request-a-day free tier is the difference
-between lasting until lunchtime and lasting all week.
-
-The server keeps the model's own answers and replays them for the same words on the
-same screen. It's shared across the whole school, so when one teacher's phrasing is
-learned, every other teacher gets it free. The dock shows **↺ from memory** and a
-running count of calls saved.
-
-**This is not the old parser coming back.** It never interprets anything — it only
-repeats a decision the model itself made. A miss costs an API call; it can never cause
-a wrong action. What it refuses to cache is the load-bearing part:
-
-| Refused | Why |
-|---|---|
-| *"change **it** to eleven"*, *"do that **again**"*, *"mark **her** absent"* | Only means something in context; replaying an old answer would be confidently wrong |
-| *"who is absent **today**"*, *"show **tomorrow**"* | Anchored to the present — the answer would rot overnight |
-| Any decision that wrote a **resolved date** | Same reason, caught even when the wording looked safe |
-| A screen whose **actions or dropdown options changed** | A cached call could name a control that no longer exists |
-| **Failed** requests | Only successful decisions are ever stored |
-
-Current control *values* are deliberately **not** part of the key — "mark all present"
-is the same decision whether the class filter reads X or XI, and keying on values would
-collapse the hit rate to nothing.
-
-Capped at 500 entries (LRU) with a 24-hour expiry, held in memory — restarting the
-server clears it.
-
-### When something is not possible
-
-The assistant will not silently do nothing. If a request does not map onto anything
-on the current screen it says so and names what *is* available; if it is ambiguous in
-a way that changes the outcome it asks one short question. A tool call naming a
-control or action that does not exist is reported in the transcript rather than
-swallowed.
-
-### Language
-
-English (`en-IN`) and Tamil (`ta-IN`), switchable from the dock or Settings. Speech
-recognition quality on Tamil proper nouns is the weakest link in the chain — see
-[Notes and limits](#notes-and-limits).
-
-### Shortcuts
-
-| Key | Action |
-|---|---|
-| <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> | Start / stop listening |
 
 ---
+
+## Running it locally
+
+```bash
+npm install                                              # server dependencies only
+node server/provision.js admin admin my-password         # create the first account
+node server/provision.js demo                            # optional: load the sample school
+node serve.js                                            # → http://localhost:5490
+```
+
+Sign in with the account you just created. Without `provision.js demo` the portal
+opens empty and takes you straight to **School Data**, where you load a school.
+
+The browser half has no build step, no bundler and no dependencies. Only the
+server needs npm.
+
+### Commands
+
+```bash
+node serve.js                     # port 5490
+node serve.js 8080                # any other port
+npm test                          # both suites
+node tests/ai.test.js             # the three intelligence engines, no server needed
+node tests/server.test.js         # sessions, roles, provisioning, persistence
+node server/provision.js status   # what this instance currently holds
+```
+
+---
+
+## Provisioning a school
+
+### The data file
+
+One JSON object holding the school profile, its roll, staff, marks, receipts,
+attendance and the accounts it signs in with.
+[`samples/school-template.json`](samples/school-template.json) is a complete,
+commented, valid example — keys beginning with `_` are ignored, so the notes can
+stay in the file.
+
+A full backup taken from **Settings → Full backup** has exactly this shape, which
+is what makes a backup enough to re-create a school on a new deployment.
+
+| Key | Required | Notes |
+|---|---|---|
+| `school` | yes | `name` is required. `yearStart`, `yearWorkingDays`, `minAttendance` drive the eligibility forecast |
+| `students` | yes | `id`, `name`, `cls` required; ids must be unique |
+| `accounts` | no | Sign-ins created at import; existing usernames are never overwritten |
+| `attDays` + `attHistory` | no | One `P`/`A`/`L` character per working day, per student — lengths must match |
+| `marks` | no | Keyed `studentId\|term\|subject` |
+| `staff`, `receipts`, `notices`, `applications` | no | Arrays |
+
+### Loading it
+
+Through the admin UI — **School Data** in the sidebar, admin only:
+
+1. Choose the file. It is validated before anything is written.
+2. Read the report: a summary of what the file contains, errors that refuse the
+   import, and warnings that do not.
+3. Confirm. The import replaces the school profile and every record in one
+   transaction — a failed import never leaves half a school behind.
+
+Or from the command line, which is the same code path:
+
+```bash
+node server/provision.js import path/to/school.json
+```
+
+### Errors and warnings
+
+The importer reports rather than repairs, and the distinction is deliberate.
+**Errors** are things that would break the portal — a missing `students` array,
+duplicate ids, an attendance string that does not line up with the calendar — and
+they refuse the import outright. **Warnings** are the ordinary defects of a real
+student master, such as a missing Aadhaar or a nine-digit phone number; those
+import fine and then show up in Data Quality, which is exactly where a school
+should be working through them. Refusing a file because 3% of guardians have no
+second phone number would mean no school could ever onboard.
+
+---
+
+## Deploying
+
+The same image serves any school; only the database differs.
+
+### Docker
+
+```bash
+docker build -t school-portal .
+docker run -p 5490:5490 \
+  -e DATABASE_URL=postgres://user:pass@host:5432/schooldb \
+  -e ADMIN_USERNAME=admin -e ADMIN_PASSWORD=a-strong-password \
+  school-portal
+```
+
+`ADMIN_USERNAME` / `ADMIN_PASSWORD` only take effect on an instance with no
+accounts at all, so they cannot overwrite a password someone has already changed.
+They exist for platforms where running a one-off command is awkward.
+
+### Choosing a database
+
+**Postgres for anything cloud-hosted.** Set `DATABASE_URL` (or `PG_CONNECTION`)
+and the Postgres adapter is selected at startup — no code change. Migrations are
+idempotent and applied automatically on boot; run them by hand with
+`node server/migrate.js` if you prefer.
+
+**SQLite for a single on-premise server with a real disk.** The default. One file
+per school under `data/`, chosen with `SCHOOL_DB`. Note that on most cloud
+platforms the container filesystem is ephemeral: an SQLite file there disappears
+on the next restart, taking the school with it. Mount a volume or use Postgres.
+
+`better-sqlite3` is an *optional* dependency, because it is a native addon that
+ships prebuilt binaries only for some Node ABIs. If it cannot install or load,
+`npm install` still succeeds, the server still starts and serves the site, and
+the data endpoints answer `503 no_database` rather than crashing.
+
+### Environment
+
+See [`.env.example`](.env.example) for the full list. `serve.js` reads `.env` at
+startup without overriding anything already set in the real environment.
+
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | Use Postgres. Unset means SQLite |
+| `SCHOOL_DB` | SQLite filename under `data/` |
+| `PORT` / `HOST` | When `PORT` is set the server binds `0.0.0.0`; otherwise loopback |
+| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | First-boot administrator, only on an instance with no accounts |
+| `SESSION_DAYS` | How long a sign-in lasts. Default 7 |
+| `MAX_UPLOAD_MB` | Largest school file accepted. Default 25 |
+
+---
+
+## Accounts and access
+
+Every account lives in the database with a scrypt-hashed password and a per-user
+salt. Sessions are opaque random tokens held server-side; the browser only ever
+receives an HttpOnly cookie.
+
+| Role | Sees | Can change |
+|---|---|---|
+| `admin` | Everything | Everything, including school data and accounts |
+| `principal` | Everything except accounts | School records |
+| `teacher` | Their teaching screens, attendance, marks, intelligence | School records |
+| `accountant` | Fees, dues, scholarships | Fee records |
+| `parent` / `student` | One child's record | Nothing |
+
+**Roles are enforced on the server.** The sidebar hiding a screen is a
+convenience; the API refuses the request regardless. `tests/server.test.js`
+asserts this directly — a teacher cannot list accounts or import a school, and a
+parent cannot write at all.
+
+Accounts are managed on **School Data → Accounts**. Anyone can change their own
+password in Settings; an administrator can change anyone's.
+
 
 ## 🧠 Intelligence layer
 
-Three engines, all running **entirely in your browser**. No student data is sent
-anywhere — which is not a nicety but a legal requirement: under India's DPDP Act
+Three engines, all running **entirely in the browser**, over the school data already loaded there.
+No student data is sent anywhere — which is not a nicety but a legal requirement: under India's DPDP Act
 2023 every student here is a child, and sending identifiable child data to a
 third-party API without verifiable parental consent is the most expensive mistake
 a school can make.
@@ -272,7 +230,7 @@ exportable correction worklist.
 ### 3 · Scholarship Match — `#scholarships`
 
 Money families are entitled to and routinely never claim, because nobody has time
-to cross-check 390 records against 10 schemes with different income ceilings, class
+to cross-check every record against 10 schemes with different income ceilings, class
 ranges and attendance conditions. Covers SC/ST pre- and post-matric, BC/MBC/DNC,
 minority pre-matric, Puthumai Penn, Tamil Pudhalvan, first-graduate, merit-cum-means,
 CWSN and free bus pass.
@@ -290,11 +248,13 @@ belong with the staff responsible for them.
 
 ---
 
+---
+
 ## What is built
 
-**Public site** (`index.html`) — hero, about, academics by level, voice showcase,
-admissions with timeline and fee structure, board results and toppers, campus
-gallery, notice board, contact, and a role-picker login.
+**Public site** (`index.html`) — landing page, about, academics by level,
+admissions with timeline and fee structure, results, notice board, contact, and
+the sign-in. School identity on this page is filled from the loaded profile.
 
 **Portal** (`app.html`)
 
@@ -304,103 +264,151 @@ gallery, notice board, contact, and a role-picker login.
 | 🧠 Attendance Alerts | Day-level pattern detection + 75% eligibility forecasting |
 | 🩺 Data Quality | 17 EMIS/UDISE+ pre-upload checks with a health score |
 | 🎁 Scholarship Match | 10 TN & GoI schemes matched with full reasoning |
-| Student Master | ~370 seeded students, filter by class/section/medium/community, search, CSV export |
+| Student Master | The school's roll — filter by class/section/medium/community, search, CSV export |
 | Student Profile | Personal & family, academics, fees, attendance — with certificate generation |
-| New Admission | 21-field admission form — dictate it or type it |
+| New Admission | 21-field admission form |
 | Attendance | Daily roll call, status filter, absentee SMS queue, register save |
 | Mark Entry | Class × exam × subject grid, live average and fail count |
 | Report Cards | Printable progress report with grades, class rank and attendance |
 | Fee Collection | Monthly collection chart, receipt register, collection form |
 | Fee Dues | Defaulter list with balances and reminder dispatch |
 | Staff | Teaching and non-teaching register, pupil–teacher ratio |
-| Circulars | Notice board, dictate a new circular |
+| Circulars | Notice board |
 | Reports & Govt. | EMIS/UDISE+ style community and medium returns, downloadable statutory registers |
-| Settings | Theme, assistant language and status, school profile, demo data reset |
-
-Tamil Nadu specifics are modelled throughout: EMIS and UDISE pupil IDs, community
-categories (OC/BC/BCM/MBC/SC/ST), RTE 25% seats, Std XI–XII group choice, quarterly
-/ half-yearly / annual exam terms, noon meal beneficiaries, free supply registers
-and public-exam attendance eligibility at 75%.
+| School Data | Import a school file, manage accounts, clear the deployment (admin only) |
+| Settings | Theme, school profile, your password, full backup |
 
 ---
 
 ## Layout
 
 ```
-index.html                  public site + login (agent enabled)
+index.html                  public site + sign-in
 app.html                    portal shell
-serve.js                    static server + POST /api/agent proxy
-server/
-  agent.js                  the agent's brain — prompt, tools, Gemini call
-                            (never served over HTTP; the API key lives here)
-  cache.js                  replays decisions the model already made
+serve.js                    static server + the /api surface
+Dockerfile                  one image, any school
+migrations/
+  001_init.sql              the whole schema; idempotent
+samples/
+  school-template.json      a complete, valid, commented school file
+server/                     never served over HTTP (see PRIVATE in serve.js)
+  db.js                     SQLite adapter
+  db_pg.js                  Postgres adapter — same contract, documented in db.js
+  auth.js                   scrypt password hashing, sessions, role helpers
+  importer.js               validates a school file: errors refuse, warnings inform
+  demo.js                   the sample school generator
+  provision.js              CLI: create an admin, import a file, load the demo
+  migrate.js                applies migrations/ to Postgres
 assets/
   css/
     base.css                design tokens, reset, components, dark theme
     site.css                landing page
     app.css                 portal shell, dashboards, tables
-    agent.css               the assistant dock
     ai.css                  AI visual language — aurora band, beacons, gauges
   js/
-    core.js                 storage, seed data, formatters, toasts, theme
-    agent.js                speech capture, screen manifests, tool execution
+    domain.js               TN domain model + calendar. Loaded by browser AND Node
+    core.js                 session, API helper, storage, formatters, DB facade
     ai.js                   the three on-device intelligence engines
-    app.js                  router, every module view, every screen manifest
+    app.js                  router and every module view
 tests/
-  agent.test.js             the voice agent, with the model call mocked
-  ai.test.js                attendance / data-quality / scholarship engines
+  ai.test.js                the intelligence engines
+  server.test.js            sessions, roles, provisioning, persistence
+data/                       SQLite files. Gitignored, and never served
 ```
 
-Only the server needs npm. The browser side stays dependency-free.
+`assets/js/domain.js` is loaded twice on purpose — as a plain `<script>` in the
+browser, and via `require()` in Node for the demo generator, the importer and the
+tests. It is the one file both halves share, so nothing in it may touch the DOM,
+`localStorage`, `fetch` or the filesystem.
+
+---
+
+## Architecture
+
+**The database is the single source of truth.** The browser holds no
+authoritative copy: `DB.load()` fetches the school and every collection from
+`/api/bootstrap` on boot, and `DB.save(name)` writes a whole collection back.
+`localStorage` keeps exactly one thing — the theme. Two members of staff on two
+machines see the same school, and a shared office machine does not leak one
+session's data into the next.
+
+Collections are stored whole, as JSON documents, rather than a row per record.
+The portal saves a collection at a time, so this keeps the write path honest:
+what the browser holds after a save is exactly what the database holds. For a
+school-sized roll the documents stay small; a district-sized deployment would
+want row-level storage and deltas instead.
+
+Both storage adapters implement one contract, documented at the top of
+`server/db.js`, and every method is async even where SQLite is synchronous — so
+`serve.js` never needs to know which one it is holding.
 
 ## Tests
 
 ```
-npm test                     # both suites
-node tests/agent.test.js     # 56 assertions — no API key needed
-node tests/ai.test.js        # 65 assertions — no dependencies
+npm test                      # both suites
+node tests/ai.test.js         # 65 assertions, no server, no network
+node tests/server.test.js     # 42 assertions against a real server
 ```
 
-`agent.test.js` mocks the model call, so it runs offline. It checks the request
-shape (correct model, JSON schemas, forced function calling, thinking off), the
-screen inventory the model is shown, **that no student data can reach the payload**,
-and that returned tool calls actually drive a page — including that an unknown action
-or an impossible value is surfaced rather than silently dropped.
+`ai.test.js` builds the demo school with `server/demo.js` and hydrates `DB` with
+it exactly as `DB.load()` would, then covers data integrity (student-id *and*
+roll-number uniqueness), every anomaly detector, forecast boundaries, each
+data-quality rule against hand-built valid and invalid records, and scholarship
+eligibility including income ceilings. `global.fetch` is stubbed to throw, so an
+engine that tried to reach the network would fail the suite.
 
-`ai.test.js` covers seed integrity (student-id *and* roll-number uniqueness), every
-anomaly detector, forecast boundaries, each data-quality rule against hand-built valid
-and invalid records, and scholarship eligibility including income ceilings.
+`server.test.js` starts a real server on a spare port against a throwaway SQLite
+file and drives it over HTTP the way the browser does. It covers sign-in
+(including that an unknown username and a wrong password are indistinguishable),
+role enforcement on every mutating route, import validation, that a refused
+import changes nothing, collection round-trips, password rules, and that signing
+out actually kills the session. It skips itself with a message if
+`better-sqlite3` is not installed.
+
+There is no test framework: both are plain Node scripts that print `PASS`/`FAIL`
+and exit non-zero on any failure.
 
 ---
 
 ## Notes and limits
 
-- **Demo data.** Everything is generated deterministically on first load and stored
-  in `localStorage`. *Settings → Reset demo data* restores it.
-- **Speech recognition is the weakest link, not the agent.** The browser's Web Speech
-  API turns your voice into text before the model sees anything; Indian-English and Tamil
-  proper nouns are where it struggles. If a name comes out wrong, the agent faithfully
-  fills in the wrong name. Every field still accepts typing, and the dock's text box
-  runs the same agent.
-- **Each *new* utterance is one API call, and the free tier is finite.** Roughly
-  1,000–1,500 a day and 15 a minute on Flash-Lite. Repeated phrasings are replayed
-  from the [decision cache](#the-decision-cache) for free, so the practical ceiling is
-  much higher than the raw number — but the first time anyone says something, it costs
-  a call. When the quota goes, the assistant says so and stops listening.
-- **Flash-Lite is a small model.** It handles navigation and filters reliably; spoken
-  dates and Tamil names dictated into the admission form are where it is weakest. If
-  that matters more than quota, set `GEMINI_MODEL=gemini-3.6-flash` in `.env`.
-- **Latency is real.** Expect a second or two between speaking and the screen moving.
-  The dock shows a spinner so it does not look frozen.
-- **The agent only knows what a screen declares.** If a control is missing from a
-  manifest, the assistant genuinely cannot operate it — and will say so rather than
-  guess.
-- SMS, payment gateway, EMIS upload and file downloads are simulated — they raise a
-  toast rather than calling a real service.
-- This is a demonstration build, not a production deployment: no backend, no
-  authentication, no audit trail, no encryption.
+- **Simulated integrations.** SMS, the payment gateway, EMIS upload and file
+  dispatch raise a toast rather than calling a real service. The records they
+  would produce are written; the outbound call is not made.
+- **No audit trail.** The database records the current state, not who changed
+  what and when. A school subject to an audit requirement needs that added before
+  this holds real records.
+- **No encryption at rest.** That is the database's job — use a managed Postgres
+  with encryption enabled, or an encrypted volume.
+- **Whole-collection writes.** Saving a register rewrites the whole `students`
+  document. Correct and simple at school scale; the wrong shape at district
+  scale.
+- **Sessions are not revoked on role change.** Changing a user's role takes
+  effect at their next sign-in.
+- **The importer trusts the file's own consistency.** It checks structure,
+  identity and calendar alignment, not whether a fee total is arithmetically
+  right.
 
 ---
+
+## Data protection
+
+Every student in this system is a child under India's DPDP Act 2023, and their
+records here include names, addresses, guardians' phone numbers and Aadhaar.
+
+- **No student data leaves the deployment.** All three intelligence engines are
+  rule-based and run in the browser. There is no model API, no analytics, no
+  third-party call anywhere in the request path.
+- **`data/`, `server/` and `migrations/` are refused over HTTP**, listed in
+  `PRIVATE` in `serve.js`. The SQLite file holds the entire school; it must never
+  be reachable by URL. Any new directory holding data or server code belongs in
+  that list too.
+- **Parents and students see one child and write nothing**, enforced server-side.
+  They never see the intelligence screens: risk scores about a child belong with
+  the staff responsible for them.
+- **Deleting a school is deleting one database.** Nothing about a school is
+  spread across shared tables.
+
 
 ## Licence
 
@@ -417,9 +425,11 @@ the author — is responsible for:
 - **Verifiable parental consent** and the rest of the DPDP Act 2023 / DPDP Rules 2025
   regime, whose substantive obligations bite on **13 May 2027**. Every student here is
   a child under that Act, and children's-data breaches sit in the highest penalty band.
-- A **real backend with authentication**, encryption at rest and in transit, and an
-  audit trail. This build has none of those, by design — it stores everything in
-  `localStorage` so it can be demonstrated by opening a page.
+- **Encryption at rest and in transit, and an audit trail.** This build authenticates
+  (scrypt-hashed passwords, server-side sessions, roles enforced on the server) and
+  keeps every record in a real database, but it does not encrypt storage and does not
+  record who changed what. Terminate TLS in front of it, use an encrypted database,
+  and add an audit log before it holds real children's records.
 - **Bias review of the intelligence layer.** A model fitted to historical attendance
   will happily learn which communities drop out and then help make that true. The
   engines here are deliberately transparent and rule-based so their reasoning can be
@@ -427,7 +437,8 @@ the author — is responsible for:
 
 ### Third-party assets
 
-No third-party code is bundled — the application has no dependencies. The three
+No third-party code is bundled into the browser: the client half has no dependencies
+and no build step. The server uses `pg` and, optionally, `better-sqlite3`. The three
 typefaces (Outfit, Inter, Noto Sans Tamil) are loaded at runtime from Google Fonts
 and are each licensed under the SIL Open Font License; they are linked, not
 redistributed, so nothing in this repository carries their terms. Remove the

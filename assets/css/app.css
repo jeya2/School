@@ -245,3 +245,11 @@ body.app { background: var(--bg); overflow-x: hidden; }
 .quick-tile .ico { width: 38px; height: 38px; border-radius: var(--r-sm); display: grid; place-items: center; font-size: 1.15rem; background: var(--navy-100); flex: none; }
 .quick-tile b { display: block; font-family: var(--font-display); font-size: .88rem; }
 .quick-tile small { color: var(--text-mute); font-size: .74rem; }
+
+/* ---------- Import report ----------
+   The validator's findings, listed under the summary on the School Data
+   screen. Errors refuse the import; warnings do not, so they must not
+   look alike. */
+.import-findings { margin: .35rem 0 0 1.1rem; padding: 0; }
+.import-findings li { font-size: .84rem; color: var(--text-soft); margin-bottom: .28rem; line-height: 1.45; }
+.import-findings li.bad { color: var(--rose-600); }

@@ -1,0 +1,159 @@
+{
+  "_readme": [
+    "A school's data file. One JSON object; this is the only route data takes into a deployment.",
+    "Load it on the School Data screen, or with: node server/provision.js import <file>.",
+    "The importer refuses the file on any error and lists warnings without blocking.",
+    "Keys beginning with an underscore are ignored, so these notes can stay in the file.",
+    "A full export from a running deployment (Settings -> Full backup) has exactly this shape,",
+    "which is what makes a backup enough to re-create a school on a new deployment."
+  ],
+
+  "school": {
+    "_note": "name is required. yearStart, yearWorkingDays and minAttendance drive the eligibility forecast.",
+    "name": "Example Higher Secondary School",
+    "short": "Example Hr. Sec.",
+    "tamil": "எடுத்துக்காட்டு மேல்நிலைப் பள்ளி",
+    "addr": "1, Main Road, Erode – 638 001, Tamil Nadu",
+    "phone": "0424 – 0000 000",
+    "email": "office@example.edu.in",
+    "code": "33000",
+    "udise": "33000000000",
+    "year": "2026–27",
+    "est": 1990,
+    "yearStart": "2026-06-01",
+    "yearWorkingDays": 220,
+    "minAttendance": 0.75
+  },
+
+  "_accounts": [
+    "Sign-ins created at import. Existing usernames are left alone, so re-importing",
+    "never resets a password someone has already changed. Passwords are hashed with",
+    "scrypt on arrival and the plaintext is not stored. Roles: admin, principal,",
+    "teacher, accountant, parent, student. Give parent and student accounts a sid."
+  ],
+  "accounts": [
+    { "username": "admin", "password": "change-this-password", "name": "R. Saravanan", "title": "Office Superintendent", "role": "admin" },
+    { "username": "kavitha", "password": "change-this-password", "name": "M. Kavitha", "title": "Class Teacher · X-A", "role": "teacher" },
+    { "username": "parent0001", "password": "change-this-password", "name": "S. Murugesan", "title": "Parent", "role": "parent", "sid": "S0001" }
+  ],
+
+  "_students": [
+    "id, name and cls are required; every id must be unique.",
+    "cls is a Roman numeral I–XII. community is OC/BC/BCM/MBC/SC/ST. medium is Tamil or English.",
+    "group applies to Std XI–XII only: Bio-Maths, Pure Science, Computer Science, Commerce, Vocational.",
+    "attPresent and attTotal are aggregates; the day-by-day series lives in attHistory.",
+    "income, firstGraduate, cwsn, community and rte are what the scholarship matcher reads —",
+    "leave them out and a child simply will not match the schemes that depend on them."
+  ],
+  "students": [
+    {
+      "id": "S0001",
+      "adm": "EX0001",
+      "emis": "3310000001",
+      "name": "Karthik Raja",
+      "gender": "Male",
+      "cls": "X",
+      "sec": "A",
+      "roll": 1,
+      "group": "",
+      "medium": "Tamil",
+      "dob": "2010-03-12",
+      "community": "MBC",
+      "religion": "Hindu",
+      "blood": "O+",
+      "aadhaar": "482913756240",
+      "father": "Murugesan",
+      "fatherOcc": "Weaver",
+      "mother": "Amutha",
+      "phone": "9843045678",
+      "address": "42, Main Road, Erode",
+      "admitted": "2016-06-01",
+      "rte": false,
+      "transport": "",
+      "hostel": false,
+      "feeTotal": 17500,
+      "feePaid": 12000,
+      "attPresent": 49,
+      "attTotal": 51,
+      "income": 96000,
+      "firstGraduate": true,
+      "cwsn": false,
+      "status": "Active"
+    },
+    {
+      "id": "S0002",
+      "adm": "EX0002",
+      "emis": "3310000002",
+      "name": "Divya Selvam",
+      "gender": "Female",
+      "cls": "XII",
+      "sec": "A",
+      "roll": 1,
+      "group": "Bio-Maths",
+      "medium": "English",
+      "dob": "2008-07-19",
+      "community": "SC",
+      "religion": "Hindu",
+      "blood": "B+",
+      "aadhaar": "561239874102",
+      "father": "Selvam",
+      "fatherOcc": "Daily Wage",
+      "mother": "Vasanthi",
+      "phone": "9843045679",
+      "address": "18, Anna Nagar, Erode",
+      "admitted": "2014-06-02",
+      "rte": false,
+      "transport": "Route 2 · Thindal",
+      "hostel": false,
+      "feeTotal": 25000,
+      "feePaid": 25000,
+      "attPresent": 45,
+      "attTotal": 51,
+      "income": 72000,
+      "firstGraduate": true,
+      "cwsn": false,
+      "status": "Active"
+    }
+  ],
+
+  "_staff": ["The staff register. id and name are what the portal lists on; the rest is shown on the Staff screen."],
+  "staff": [
+    { "id": "T01", "name": "M. Kavitha", "role": "Teacher", "subject": "Mathematics", "cls": "X-A", "qual": "M.Sc., B.Ed.", "phone": "9843012301", "joined": "2012-06-04" },
+    { "id": "A01", "name": "R. Saravanan", "role": "Admin", "subject": "Office", "cls": "—", "qual": "B.Com.", "phone": "9843012311", "joined": "2008-04-01" }
+  ],
+
+  "_attDays": [
+    "Every working day the attendance history covers, oldest first, as YYYY-MM-DD.",
+    "attHistory[studentId] must hold exactly one character per entry here, or the import is refused."
+  ],
+  "attDays": ["2026-06-01", "2026-06-02", "2026-06-03"],
+
+  "_attHistory": ["One character per working day: P present, A absent, L late (late counts as present)."],
+  "attHistory": {
+    "S0001": "PPP",
+    "S0002": "PAP"
+  },
+
+  "_marks": ["Keyed studentId|term|subject. Terms: Unit Test 1, Quarterly, Half-Yearly, Unit Test 2, Model Exam, Annual."],
+  "marks": {
+    "S0001|Quarterly|Mathematics": 78,
+    "S0001|Quarterly|Tamil": 84,
+    "S0002|Quarterly|Physics": 91
+  },
+
+  "_receipts": ["Fee receipts already issued, so the collection register and dues open with the right totals."],
+  "receipts": [
+    { "id": "R1001", "no": "RC1001", "sid": "S0001", "name": "Karthik Raja", "cls": "X", "sec": "A", "date": "2026-06-14", "head": "Tuition Fee", "mode": "UPI", "amount": 12000 }
+  ],
+
+  "_notices": ["Circulars shown on the notice board."],
+  "notices": [
+    { "id": "N1", "date": "2026-08-02", "title": "Quarterly examination timetable", "body": "Examinations commence on 18 August 2026.", "to": "All", "by": "Principal" }
+  ],
+
+  "_attendance": ["Day registers already marked, keyed date|class|section. Usually empty at import."],
+  "attendance": {},
+
+  "_applications": ["Admission applications in progress. Usually empty at import."],
+  "applications": []
+}

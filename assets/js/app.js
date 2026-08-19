@@ -2,14 +2,14 @@
    app.js — portal shell, router and all module views
    ============================================================ */
 
-/* ───────────────────────── session ───────────────────────── */
-const session = Store.get('session');
-if (!session) location.replace('index.html');
-const ROLE = session?.role || 'admin';
-DB.load();
+/* ───────────────────────── session ─────────────────────────
+   USER and ROLE are filled from /api/bootstrap during boot, below.
+   There is no client-side session to forge: the cookie is HttpOnly and
+   every API call is authorised on the server against it. */
+let ROLE = 'admin';
 
 /* ───────────────────────── modal ─────────────────────────── */
-function openModal({ title, body, actions = [], wide = false, onOpen }) {
+function openModal({ title, body, actions = [], wide = false }) {
   const host = document.getElementById('modalHost');
   host.innerHTML = `
     <div class="modal-back" id="mBack">
@@ -26,11 +26,10 @@ function openModal({ title, body, actions = [], wide = false, onOpen }) {
   host.querySelector('#mX').onclick = closeModal;
   host.querySelector('#mBack').onclick = e => { if (e.target.id === 'mBack') closeModal(); };
   actions.forEach((a, i) => host.querySelector(`[data-a="${i}"]`).onclick = () => a.fn?.());
-  onOpen?.(host.querySelector('#mBody'));
 }
 function closeModal() {
   document.getElementById('modalHost').innerHTML = '';
-  route();   // re-publishes the underlying screen's manifest to the agent
+  route();   // repaint the screen underneath
 }
 addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
@@ -41,7 +40,7 @@ const NAV = [
   ]},
   { group: 'Students', items: [
     { id: 'students',  label: 'Student Master', ico: '👨‍🎓', roles: 'admin,principal,teacher,accountant' },
-    { id: 'admission', label: 'New Admission',  ico: '➕', roles: 'admin,principal', tag: 'Voice' },
+    { id: 'admission', label: 'New Admission',  ico: '➕', roles: 'admin,principal' },
     { id: 'mychild',   label: 'My Record',      ico: '🎒', roles: 'parent,student' },
   ]},
   { group: 'Intelligence', items: [
@@ -50,12 +49,12 @@ const NAV = [
     { id: 'scholarships', label: 'Scholarship Match', ico: '🎁', roles: 'admin,principal,accountant', tag: 'AI', ai: true },
   ]},
   { group: 'Daily Work', items: [
-    { id: 'attendance', label: 'Attendance', ico: '📋', roles: 'admin,principal,teacher', tag: 'Voice' },
-    { id: 'marks',      label: 'Mark Entry', ico: '✍️', roles: 'admin,principal,teacher', tag: 'Voice' },
+    { id: 'attendance', label: 'Attendance', ico: '📋', roles: 'admin,principal,teacher' },
+    { id: 'marks',      label: 'Mark Entry', ico: '✍️', roles: 'admin,principal,teacher' },
     { id: 'exams',      label: 'Report Cards', ico: '📝', roles: 'admin,principal,teacher' },
   ]},
   { group: 'Finance', items: [
-    { id: 'fees',      label: 'Fee Collection', ico: '💰', roles: 'admin,principal,accountant', tag: 'Voice' },
+    { id: 'fees',      label: 'Fee Collection', ico: '💰', roles: 'admin,principal,accountant' },
     { id: 'defaulters',label: 'Fee Dues',       ico: '⚠️', roles: 'admin,principal,accountant' },
   ]},
   { group: 'School', items: [
@@ -64,6 +63,7 @@ const NAV = [
     { id: 'reports', label: 'Reports & Govt.', ico: '🏛', roles: 'admin,principal' },
   ]},
   { group: 'System', items: [
+    { id: 'provision', label: 'School Data', ico: '🏫', roles: 'admin' },
     { id: 'settings', label: 'Settings', ico: '⚙️', roles: '*' },
   ]}
 ];
@@ -80,34 +80,18 @@ function paintNav() {
       </a>`).join('')}</div>`;
   }).join('');
 
-  const u = DEMO_USERS[ROLE];
+  /* Branding comes from the school profile, not the markup — this is the
+     same build serving whichever school the database holds. */
+  document.title = SCHOOL.short || SCHOOL.name || 'School Portal';
+  document.getElementById('crest').textContent = initials(SCHOOL.short || SCHOOL.name);
+  document.getElementById('brandName').textContent = SCHOOL.short || SCHOOL.name || '—';
+  document.getElementById('sideYear').textContent = SCHOOL.year ? 'Academic Year ' + SCHOOL.year : 'No academic year set';
+
+  const u = USER || { name: '—', title: '—' };
   document.getElementById('userAvatar').textContent = initials(u.name);
   document.getElementById('userName').textContent = u.name;
   document.getElementById('userRole').textContent = u.title;
 
-}
-
-/** Every screen this role may open — the agent's navigation vocabulary. */
-function agentRoutes() {
-  return NAV.flatMap(g => g.items).filter(allowed).map(it => ({ id: it.id, label: it.label }));
-}
-
-/** Turn every labelled input inside a container into an agent control. */
-function controlsFrom(container, extra = {}) {
-  if (!container) return [];
-  return [...container.querySelectorAll('input[id], select[id], textarea[id]')]
-    .filter(el => !el.disabled && !el.readOnly && el.type !== 'hidden')
-    .map(el => {
-      const label = el.closest('.field')?.querySelector('label')?.textContent
-        || document.querySelector(`label[for="${el.id}"]`)?.textContent
-        || el.placeholder || el.name || el.id;
-      return {
-        id: el.id,
-        label: label.replace(/\*/g, '').trim(),
-        el,
-        hint: extra[el.id]
-      };
-    });
 }
 
 /* ───────────────────────── router ────────────────────────── */
@@ -129,16 +113,6 @@ function route() {
   view.innerHTML = '';
   view.className = 'view fade-up';
 
-  /* Baseline manifest: navigation always works. Each route replaces this
-     with its own, richer one — and any that forgets still leaves the agent
-     able to move around rather than stranded. */
-  Agent.screen({
-    screen: id,
-    label: (NAV.flatMap(g => g.items).find(i => i.id === id) || {}).label || id,
-    description: 'A screen in the school management portal.',
-    role: DEMO_USERS[ROLE].title,
-    routes: agentRoutes()
-  });
 
   fn(view, params);
   scrollTo({ top: 0, behavior: 'instant' });
@@ -232,7 +206,7 @@ ROUTES.dashboard = view => {
   view.innerHTML = `
     <div class="page-head">
       <div>
-        <h1>Good ${new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, ${esc(DEMO_USERS[ROLE].name.split(' ').slice(-1)[0])}</h1>
+        <h1>Good ${new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, ${esc((USER?.name || "").split(' ').slice(-1)[0])}</h1>
         <p>${new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} · Working day 79 of the academic year</p>
       </div>
       <div class="row">
@@ -288,7 +262,7 @@ ROUTES.dashboard = view => {
 
     <h3 style="margin-bottom:.8rem">Quick Actions</h3>
     <div class="grid g4">
-      <a class="quick-tile" href="#admission"><span class="ico">➕</span><span><b>Admit a Student</b><small>Voice-enabled form</small></span></a>
+      <a class="quick-tile" href="#admission"><span class="ico">➕</span><span><b>Admit a Student</b><small>Add a new student record</small></span></a>
       <a class="quick-tile" href="#attendance"><span class="ico">📋</span><span><b>Roll Call</b><small>Say present or absent</small></span></a>
       <a class="quick-tile" href="#marks"><span class="ico">✍️</span><span><b>Enter Marks</b><small>Speak the score</small></span></a>
       <a class="quick-tile" href="#reports"><span class="ico">🏛</span><span><b>EMIS / UDISE</b><small>Government returns</small></span></a>
@@ -430,27 +404,6 @@ ROUTES.students = view => {
   document.getElementById('expBtn').onclick = () => exportCSV();
   apply();
 
-  Agent.screen({
-    screen: 'students',
-    label: 'Student Master',
-    description:
-      'The full student roll. Filter it by standard, section, medium of instruction and community, ' +
-      'or search by name or admission number. Narrowing questions about which students match some ' +
-      'description are answered by setting these filters.',
-    role: DEMO_USERS[ROLE].title,
-    routes: agentRoutes(),
-    controls: controlsFrom(document.querySelector('.toolbar'), {
-      fq: 'free-text search over student name and admission number',
-      fc: 'Roman numerals I to XII',
-      fs: 'section letter'
-    }),
-    actions: [
-      { id: 'clear_filters', label: 'Clear all filters', run: () => document.getElementById('fclear').click() },
-      { id: 'export_csv', label: 'Export the student list to CSV', run: () => exportCSV() },
-      ...(['admin', 'principal'].includes(ROLE)
-        ? [{ id: 'new_admission', label: 'Start a new admission', run: () => location.hash = '#admission' }] : [])
-    ]
-  });
 };
 
 function exportCSV() {
@@ -587,23 +540,6 @@ ROUTES.student = (view, p) => {
   document.querySelectorAll('#pTabs button').forEach(b => b.onclick = () => paint(b.dataset.t));
   paint('info');
 
-  Agent.screen({
-    screen: 'student',
-    label: 'Student Record',
-    description: `One student's full record, with tabs for personal and family details, academics, fees and attendance.`,
-    role: DEMO_USERS[ROLE].title,
-    routes: agentRoutes(),
-    actions: [
-      ...['info', 'acad', 'fee', 'att'].map((t, i) => ({
-        id: 'tab_' + t,
-        label: 'Show the ' + ['personal and family', 'academics', 'fees', 'attendance'][i] + ' tab',
-        run: () => paint(t)
-      })),
-      { id: 'report_card', label: 'Open this student\'s report card', run: () => location.hash = '#exams?id=' + s.id },
-      { id: 'certificates', label: 'Generate a certificate', run: () => tcModal(s.id) },
-      { id: 'back_to_list', label: 'Go back to the student master', run: () => location.hash = '#students' }
-    ]
-  });
 };
 
 function tcModal(id) {
@@ -631,16 +567,7 @@ ROUTES.admission = view => {
       <div><h1>New Admission</h1><p>Academic year ${SCHOOL.year} · dictate the record or fill it in by hand.</p></div>
       <div class="row">
         <button class="btn btn-ghost" id="demoFill">⚡ Fill sample</button>
-        <button class="btn btn-agent" id="startVoice">🎙 Dictate this form</button>
       </div>
-    </div>
-
-    <div class="ag-banner">
-      <span class="em">🎙</span>
-      <p><strong>Say the record however you like.</strong> Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> and talk —
-      <em>“Karthik Raja, father Murugesan, born twelfth March two thousand ten, M B C, Tamil medium, standard ten A”</em> —
-      and the assistant works out which box each part belongs in. One field at a time works just as well, and so does
-      the keyboard.</p>
     </div>
 
     <form id="admForm" class="grid" style="gap:1.15rem" onsubmit="return false">
@@ -729,7 +656,6 @@ ROUTES.admission = view => {
     if (missing.length) {
       missing.forEach(([id]) => document.getElementById(id).closest('.field').classList.add('invalid'));
       toast(`Please complete: ${missing.map(m => m[1]).join(', ')}`, 'err', 5000);
-      Agent.say('Still missing ' + missing.map(m => m[1]).join(', '));
       document.getElementById(missing[0][0]).focus();
       return;
     }
@@ -751,7 +677,6 @@ ROUTES.admission = view => {
     DB.attHistory[s.id] = ''; DB.save('attHistory');
     AI.bust();
     toast(`Admission ${s.adm} created for ${s.name}.`, 'ok', 4500);
-    Agent.say(`Saved. ${s.name} is admitted to standard ${s.cls} ${s.sec}, admission number ${s.adm}.`);
     openModal({
       title: '✅ Admission Saved',
       body: `<div style="text-align:center;padding:1rem 0">
@@ -783,7 +708,6 @@ ROUTES.admission = view => {
   });
   document.getElementById('admSave').onclick = save;
   document.getElementById('admCancel').onclick = () => location.hash = '#students';
-  document.getElementById('startVoice').onclick = () => Agent.start();
   document.getElementById('demoFill').onclick = () => {
     const d = { a_name:'Karthik Raja', a_gender:'Male', a_dob:'2010-03-12', a_blood:'O+',
       a_comm:'MBC', a_rel:'Hindu', a_aadhaar:'482913756240', a_father:'Murugesan',
@@ -792,32 +716,9 @@ ROUTES.admission = view => {
       a_prev:'Govt. Middle School, Thindal', a_transport:'Route 2 · Thindal', a_rte:'No', a_sibling:'Yes' };
     Object.entries(d).forEach(([k, v]) => { const el = document.getElementById(k); if (el) el.value = v; });
     progress();
-    toast('Sample data filled — now try editing a field by voice.', 'ok');
+    toast('Sample data filled.', 'ok');
   };
 
-  Agent.screen({
-    screen: 'admission',
-    label: 'New Admission',
-    description:
-      'A blank admission form for enrolling a new student. Dictated details go into these fields. ' +
-      'Names are Tamil — title-case them and do not anglicise them. Dates are stored as YYYY-MM-DD, ' +
-      'the standard is a Roman numeral, and phone and Aadhaar are digits with no spaces.',
-    role: DEMO_USERS[ROLE].title,
-    routes: agentRoutes(),
-    controls: controlsFrom(form, {
-      a_dob: 'the student\'s date of birth',
-      a_phone: '10 digits, no spaces',
-      a_aadhaar: '12 digits, no spaces',
-      a_cls: 'Roman numeral I to XII',
-      a_group: 'only for standards XI and XII',
-      a_emis: 'leave blank to auto-generate'
-    }),
-    actions: [
-      { id: 'save', label: 'Save the admission', run: save },
-      { id: 'cancel', label: 'Cancel and go back to the student list', run: () => location.hash = '#students' },
-      { id: 'fill_sample', label: 'Fill the form with sample data', run: () => document.getElementById('demoFill').click() }
-    ]
-  });
   progress();
 };
 
@@ -828,13 +729,6 @@ ROUTES.attendance = view => {
   view.innerHTML = `
     <div class="page-head">
       <div><h1>Attendance</h1><p>Tap to mark, or just say it — the assistant works the register with you.</p></div>
-      <button class="btn btn-agent" id="rollVoice">🎙 Talk to the assistant</button>
-    </div>
-    <div class="ag-banner">
-      <span class="em">🎙</span>
-      <p><strong>Say it however you would to a colleague.</strong>
-      <em>“Mark everyone present”</em>, <em>“roll twelve is absent”</em>, <em>“save the register”</em> — or ask a question:
-      <em>“show me all class ten students who are absent today”</em> sets the standard and the status filter for you.</p>
     </div>
     <div class="toolbar">
       <label class="lbl">Standard</label>${classSelect('ac', attState.cls, 'Select')}
@@ -903,18 +797,9 @@ ROUTES.attendance = view => {
     paint();
   }
 
-  /** Mark one student by roll number. Returns a sentence for the agent transcript. */
-  function markByRoll(roll, status) {
-    const s = list().find(x => x.roll === Number(roll));
-    if (!s) throw new Error(`There is no roll number ${roll} in ${attState.cls}-${attState.sec}.`);
-    const v = { present: 'P', absent: 'A', late: 'L' }[String(status).toLowerCase()];
-    if (!v) throw new Error(`"${status}" is not present, absent or late.`);
-    mark(s.id, v);
-    return `Roll ${s.roll}, ${s.name} → ${status}`;
-  }
 
   const reload = () => {
-    attState.marks = Store.get('attendance', {})[key()] || {};
+    attState.marks = (DB.attendance || {})[key()] || {};
     paint();
   };
   ['ac','as','ad','ashow'].forEach((id, i) => {
@@ -930,7 +815,7 @@ ROUTES.attendance = view => {
   document.getElementById('attSave').onclick = () => {
     const students = list();
     if (!students.length) return;
-    const store = Store.get('attendance', {});
+    const store = DB.attendance || {};
     const prev = store[key()] || {};
 
     /* Re-saving the same register must correct the totals, not double-count them. */
@@ -959,47 +844,15 @@ ROUTES.attendance = view => {
     }
 
     store[key()] = { ...attState.marks };
-    Store.set('attendance', store);
     DB.attendance = store;
+    DB.save('attendance');
     DB.save('students');
     AI.bust();
 
     const absent = students.filter(s => attState.marks[s.id] === 'A');
     toast(`Register saved for ${attState.cls}-${attState.sec} · ${absent.length} absentee SMS queued.`, 'ok', 4500);
-    Agent.say(`Register saved. ${absent.length} absent.`);
   };
-  document.getElementById('rollVoice').onclick = () => Agent.start();
 
-  Agent.screen({
-    screen: 'attendance',
-    label: 'Attendance',
-    description:
-      'The daily attendance register for one standard, section and date. Each student is marked P present, ' +
-      'A absent or L late. A question about which students are absent, present or late is answered by setting ' +
-      'the standard, the date and the "Showing" filter — not by naming students.',
-    role: DEMO_USERS[ROLE].title,
-    routes: agentRoutes(),
-    controls: controlsFrom(document.querySelector('.toolbar'), {
-      ac: 'Roman numeral I to XII',
-      ad: 'the register date; today is ' + todayISO(),
-      ashow: 'narrows the register to one attendance status'
-    }),
-    actions: [
-      { id: 'mark_all_present', label: 'Mark the whole class present',
-        run: () => { document.getElementById('allP').click(); return 'Marked the whole class present'; } },
-      { id: 'mark_student', label: 'Mark one student by roll number',
-        arg: 'the roll number and the status, e.g. "12 absent"',
-        run: a => {
-          const m = String(a || '').match(/(\d+)\D+(present|absent|late)/i);
-          if (!m) throw new Error('Say it as a roll number and a status, e.g. "roll twelve absent".');
-          return markByRoll(m[1], m[2]);
-        } },
-      { id: 'save_register', label: 'Save the register',
-        run: () => { document.getElementById('attSave').click(); return 'Saved the register'; } },
-      { id: 'show_everyone', label: 'Clear the status filter and show everyone',
-        run: () => { attState.show = ''; document.getElementById('ashow').value = ''; paint(); return 'Showing everyone'; } }
-    ]
-  });
   reload();
 };
 
@@ -1012,13 +865,6 @@ ROUTES.marks = view => {
   view.innerHTML = `
     <div class="page-head">
       <div><h1>Mark Entry</h1><p>Type the scores, or read them out.</p></div>
-      <button class="btn btn-agent" id="mkVoice">🎙 Talk to the assistant</button>
-    </div>
-    <div class="ag-banner">
-      <span class="em">🎙</span>
-      <p><strong>Read the marks out.</strong> <em>“Roll one eighty seven, roll two ninety two, roll three forty”</em> —
-      several at once is fine. Switch context by saying <em>“half yearly physics for twelve B”</em>, and finish with
-      <em>“save the marks”</em>.</p>
     </div>
     <div class="toolbar">
       <label class="lbl">Standard</label>${classSelect('mc', mkState.cls, 'Select')}
@@ -1081,16 +927,6 @@ ROUTES.marks = view => {
     else DB.marks[`${sid}|${mkState.term}|${mkState.subject}`] = n;
     paint();
   }
-  /** Record one student's score by roll number. Returns a line for the transcript. */
-  function markByRoll(roll, score) {
-    const s = list().find(x => x.roll === Number(roll));
-    if (!s) throw new Error(`There is no roll number ${roll} in ${mkState.cls}-${mkState.sec}.`);
-    const max = maxOf(mkState.term), n = Number(score);
-    if (!Number.isFinite(n) || n < 0 || n > max)
-      throw new Error(`${score} is not a mark between 0 and ${max}.`);
-    setMark(s.id, n);
-    return `Roll ${s.roll}, ${s.name} → ${n}`;
-  }
 
   document.getElementById('mc').onchange = e => { mkState.cls = e.target.value; subjOptions(); paint(); };
   document.getElementById('ms').onchange = e => { mkState.sec = e.target.value; paint(); };
@@ -1099,42 +935,8 @@ ROUTES.marks = view => {
   document.getElementById('mkSave').onclick = () => {
     DB.save('marks');
     toast(`Marks saved — ${mkState.cls}-${mkState.sec} · ${mkState.subject} · ${mkState.term}.`, 'ok');
-    Agent.say('Marks saved.');
   };
-  document.getElementById('mkVoice').onclick = () => Agent.start();
 
-  Agent.screen({
-    screen: 'marks',
-    label: 'Mark Entry',
-    description:
-      `Enter examination marks for one standard, section, exam and subject at a time. ` +
-      `The current paper is out of ${maxOf(mkState.term)}. Marks are recorded per student by roll number.`,
-    role: DEMO_USERS[ROLE].title,
-    routes: agentRoutes(),
-    controls: controlsFrom(document.querySelector('.toolbar'), {
-      mc: 'Roman numeral I to XII',
-      mt: 'which examination these marks belong to',
-      msub: 'the subject; the list changes with the standard'
-    }),
-    actions: [
-      { id: 'enter_mark', label: 'Record one student\'s mark',
-        arg: `the roll number and the score, e.g. "12 87". The score must be between 0 and ${maxOf(mkState.term)}.`,
-        run: a => {
-          const m = String(a || '').match(/(\d+)\D+(\d+)/);
-          if (!m) throw new Error('Say it as a roll number and a score, e.g. "roll twelve, eighty seven".');
-          return markByRoll(m[1], m[2]);
-        } },
-      { id: 'mark_absent', label: 'Record a student as absent for this paper (scores zero)',
-        arg: 'the roll number',
-        run: a => {
-          const roll = String(a || '').match(/\d+/);
-          if (!roll) throw new Error('Which roll number?');
-          return markByRoll(roll[0], 0) + ' (absent)';
-        } },
-      { id: 'save_marks', label: 'Save the marks',
-        run: () => { document.getElementById('mkSave').click(); return 'Saved the marks'; } }
-    ]
-  });
 
   subjOptions(); paint();
 };
@@ -1274,22 +1076,6 @@ ROUTES.fees = view => {
   document.getElementById('collectBtn').onclick = () => collectModal();
   paint();
 
-  Agent.screen({
-    screen: 'fees',
-    label: 'Fee Collection',
-    description:
-      'The fee counter: collection totals for the year and the register of every receipt issued. ' +
-      'The receipt register can be searched by student name or receipt number.',
-    role: DEMO_USERS[ROLE].title,
-    routes: agentRoutes(),
-    controls: controlsFrom(document.querySelector('.card-head'), {
-      rcSearch: 'searches the receipt register by student name or receipt number'
-    }),
-    actions: [
-      { id: 'collect_fee', label: 'Open the fee collection form', run: () => collectModal() },
-      { id: 'view_dues', label: 'Show the students with outstanding dues', run: () => location.hash = '#defaulters' }
-    ]
-  });
 };
 
 function collectModal(sid) {
@@ -1297,9 +1083,7 @@ function collectModal(sid) {
   openModal({
     title: '💰 Collect Fee',
     wide: true,
-    body: `<div class="ag-banner"><span class="em">🎙</span>
-        <p><strong>Dictate the receipt.</strong> <em>“Karthik Raja, term fee, five thousand rupees by U P I”</em>
-        — then <em>“save it”</em>.</p></div>
+    body: `
       <form id="feeForm" class="grid g2" style="gap:1rem" onsubmit="return false">
         <div class="field" style="grid-column:span 2"><label class="req" for="f_stu">Student</label>
           <select class="select" id="f_stu">
@@ -1319,26 +1103,8 @@ function collectModal(sid) {
       </form>`,
     actions: [
       { label: 'Cancel', cls: 'btn-ghost', fn: closeModal },
-      { label: '🎙 Dictate', cls: 'btn-agent', fn: () => Agent.start() },
       { label: '💾 Save Receipt', cls: 'btn-primary', fn: saveFee }
     ],
-    onOpen: body => Agent.screen({
-      screen: 'collect_fee',
-      label: 'Collect Fee',
-      description:
-        'A form for recording a fee payment at the counter. The student dropdown lists everyone with an ' +
-        'outstanding balance — match the spoken name against those option labels.',
-      role: DEMO_USERS[ROLE].title,
-      routes: agentRoutes(),
-      controls: controlsFrom(body.querySelector('#feeForm'), {
-        f_amt: 'rupees, digits only',
-        f_stu: 'each option is "name · class-section · due amount"'
-      }),
-      actions: [
-        { id: 'save_receipt', label: 'Save the receipt', run: saveFee },
-        { id: 'cancel', label: 'Close without saving', run: closeModal }
-      ]
-    })
   });
 
   function saveFee() {
@@ -1347,7 +1113,6 @@ function collectModal(sid) {
     const amt = +g('f_amt');
     if (!s || !amt || !g('f_head') || !g('f_mode')) {
       toast('Student, head, amount and mode are all required.', 'err');
-      Agent.say('Still need the student, the head, the amount and the payment mode.');
       return;
     }
     const no = 'RC' + (2000 + DB.receipts.length);
@@ -1357,7 +1122,6 @@ function collectModal(sid) {
     DB.save('receipts'); DB.save('students');
     closeModal();
     toast(`Receipt ${no} — ${INR(amt)} from ${s.name}.`, 'ok', 4500);
-    Agent.say(`Receipt ${no}. ${INR(amt)} from ${s.name}.`);
   }
 }
 
@@ -1433,10 +1197,7 @@ ROUTES.notices = view => {
   if (!canPost) return;
   document.getElementById('newNotice').onclick = () => openModal({
     title: '📢 New Circular',
-    body: `<div class="ag-banner"><span class="em">🎙</span>
-        <p><strong>Dictate it.</strong> <em>“Parent teacher meeting for standard ten and twelve on Saturday
-        the ninth at ten a m in the main hall”</em> — the assistant splits that into a title, a message and
-        an audience.</p></div>
+    body: `
       <form id="ntForm" class="grid" style="gap:1rem" onsubmit="return false">
         <div class="field"><label class="req" for="n_title">Title</label>
           <input class="input" id="n_title"></div>
@@ -1452,34 +1213,16 @@ ROUTES.notices = view => {
       </form>`,
     actions: [
       { label: 'Cancel', cls: 'btn-ghost', fn: closeModal },
-      { label: '🎙 Dictate', cls: 'btn-agent', fn: () => Agent.start() },
       { label: '📢 Publish', cls: 'btn-primary', fn: publish }
     ],
-    onOpen: b => Agent.screen({
-      screen: 'new_circular',
-      label: 'New Circular',
-      description:
-        'A form for issuing a circular to parents, students or staff. A dictated announcement should be ' +
-        'split into a short title, the full message, and the audience it is addressed to.',
-      role: DEMO_USERS[ROLE].title,
-      routes: agentRoutes(),
-      controls: controlsFrom(b.querySelector('#ntForm'), {
-        n_title: 'a short headline, not the whole announcement',
-        n_body: 'the full text parents will read'
-      }),
-      actions: [
-        { id: 'publish', label: 'Publish the circular', run: publish },
-        { id: 'cancel', label: 'Close without publishing', run: closeModal }
-      ]
-    })
   });
 
   function publish() {
     const t = document.getElementById('n_title').value.trim();
     const bd = document.getElementById('n_body').value.trim();
-    if (!t || !bd) { toast('Title and message are required.', 'err'); Agent.say('Still need a title and a message.'); return; }
+    if (!t || !bd) { toast('Title and message are required.', 'err'); return; }
     DB.notices.unshift({ id: uid('n'), date: document.getElementById('n_date').value || todayISO(),
-      title: t, body: bd, to: document.getElementById('n_to').value, by: DEMO_USERS[ROLE].name });
+      title: t, body: bd, to: document.getElementById('n_to').value, by: USER?.name || 'Office' });
     DB.save('notices');
     closeModal();
     toast('Circular published — SMS queued.', 'ok');
@@ -1540,51 +1283,74 @@ ROUTES.reports = view => {
 
 /* ═══════════════════════════ SETTINGS ═══════════════════════════ */
 ROUTES.settings = view => {
-  setHead('Settings', 'Preferences and demo data');
+  setHead('Settings', SCHOOL.name);
+  const admin = ROLE === 'admin';
+
+  const profileFields = [
+    ['name','School name'],['short','Short name'],['tamil','Name in Tamil'],['addr','Address'],
+    ['phone','Phone'],['email','Email'],['code','School code'],['udise','UDISE code'],
+    ['year','Academic year'],['est','Established'],['yearStart','Year start (YYYY-MM-DD)'],
+    ['yearWorkingDays','Working days in the year'],['minAttendance','Minimum attendance (0–1)']
+  ];
+
+  const profileBody = admin
+    ? `<div class="grid g2" style="gap:.9rem">
+         ${profileFields.map(([k, label]) => `<div class="field"><label for="sp_${k}">${label}</label>
+           <input class="input" id="sp_${k}" value="${esc(SCHOOL[k] ?? '')}"></div>`).join('')}
+       </div>
+       <div class="row" style="margin-top:.9rem"><button class="btn btn-primary btn-sm" id="spSave">Save profile</button></div>`
+    : `<div class="info-grid">
+         ${[['Name', SCHOOL.name], ['Address', SCHOOL.addr], ['School Code', SCHOOL.code],
+            ['UDISE Code', SCHOOL.udise], ['Academic Year', SCHOOL.year], ['Established', SCHOOL.est],
+            ['Phone', SCHOOL.phone], ['Email', SCHOOL.email]]
+           .map(([k, v]) => `<div class="info-item"><span>${k}</span><b>${esc(v)}</b></div>`).join('')}
+       </div>`;
+
   view.innerHTML = `
-    <div class="page-head"><div><h1>Settings</h1><p>Appearance, voice and demo data.</p></div></div>
+    <div class="page-head"><div><h1>Settings</h1><p>Appearance, school profile and your account.</p></div></div>
     <div class="grid g2" style="gap:1.15rem">
+
       <div class="card"><div class="card-head"><h3>Appearance</h3></div><div class="card-body col" style="gap:1rem">
         <div class="row-between"><span>Theme</span>
           <div class="seg" id="themeSeg">
             <button data-t="light" class="${document.documentElement.dataset.theme === 'light' ? 'on' : ''}">Light</button>
             <button data-t="dark" class="${document.documentElement.dataset.theme === 'dark' ? 'on' : ''}">Dark</button>
           </div></div>
+        <p class="tiny muted">The theme is the one preference kept in this browser. Every record lives in the school database.</p>
       </div></div>
 
-      <div class="card"><div class="card-head"><h3>🎙 Voice Assistant</h3><span class="badge badge-voice">Gemini</span></div>
-        <div class="card-body col" style="gap:1rem">
-        <div class="row-between"><span>Speech recognition language</span>
-          <select class="select" id="setLang" style="width:auto">
-            <option value="en-IN" ${Agent.lang === 'en-IN' ? 'selected' : ''}>English (India)</option>
-            <option value="ta-IN" ${Agent.lang === 'ta-IN' ? 'selected' : ''}>தமிழ் (Tamil)</option>
-          </select></div>
-        <div class="row-between"><span>Read replies aloud</span>
-          <label class="check"><input type="checkbox" id="setTTS" ${Agent.speak ? 'checked' : ''}> Enabled</label></div>
-        <div class="row-between"><span>Microphone</span>
-          <span class="badge ${Agent.supported ? 'badge-ok' : 'badge-warn'}">${Agent.supported ? 'Available in this browser' : 'Unavailable — type instead'}</span></div>
-        <div class="row-between"><span>Assistant</span>
-          <span class="badge" id="setAgentState">checking…</span></div>
-        <p class="tiny muted">The assistant reads the shape of each screen — its buttons and fields — and decides
-        what to operate. Student records are never sent; filtering happens in this browser.</p>
-        <button class="btn btn-ghost btn-sm" onclick="Agent.help()">📖 What can I say?</button>
+      <div class="card"><div class="card-head"><h3>Your Account</h3></div><div class="card-body col" style="gap:.8rem">
+        <div class="info-grid">
+          <div class="info-item"><span>Signed in as</span><b>${esc(USER && USER.username)}</b></div>
+          <div class="info-item"><span>Name</span><b>${esc(USER && USER.name)}</b></div>
+          <div class="info-item"><span>Role</span><b>${esc(USER && USER.role)}</b></div>
+          <div class="info-item"><span>Title</span><b>${esc((USER && USER.title) || '—')}</b></div>
+        </div>
+        <div class="field"><label for="pw1">New password</label>
+          <input class="input" type="password" id="pw1" placeholder="at least 8 characters"></div>
+        <div class="field"><label for="pw2">Repeat it</label>
+          <input class="input" type="password" id="pw2"></div>
+        <button class="btn btn-ghost btn-sm" id="pwSave">Change my password</button>
       </div></div>
 
-      <div class="card"><div class="card-head"><h3>School Profile</h3></div><div class="card-body info-grid">
-        ${[['Name', SCHOOL.name], ['Address', SCHOOL.addr], ['School Code', SCHOOL.code],
-           ['UDISE Code', SCHOOL.udise], ['Academic Year', SCHOOL.year], ['Established', SCHOOL.est],
-           ['Phone', SCHOOL.phone], ['Email', SCHOOL.email]]
-          .map(([k, v]) => `<div class="info-item"><span>${k}</span><b>${esc(v)}</b></div>`).join('')}
-      </div></div>
+      <div class="card" style="grid-column:span 2"><div class="card-head"><h3>School Profile</h3>
+        <span class="badge ${admin ? 'badge-accent' : ''}">${admin ? 'Editable' : 'Read only'}</span></div>
+        <div class="card-body">${profileBody}</div></div>
 
-      <div class="card"><div class="card-head"><h3>Demo Data</h3></div><div class="card-body col" style="gap:.9rem">
-        <p class="small muted">All records live in this browser's local storage. Nothing leaves your machine.</p>
-        <div class="stat-line"><span>Students</span><b>${DB.students.length}</b></div>
+      <div class="card"><div class="card-head"><h3>This Deployment</h3></div><div class="card-body col" style="gap:.55rem">
+        <div class="stat-line"><span>Students on roll</span><b>${DB.students.length}</b></div>
         <div class="stat-line"><span>Mark entries</span><b>${Object.keys(DB.marks).length}</b></div>
         <div class="stat-line"><span>Receipts</span><b>${DB.receipts.length}</b></div>
-        <div class="row" style="margin-top:.5rem">
-          <button class="btn btn-ghost btn-sm" onclick="exportCSV()">⬇ Export students CSV</button>
-          <button class="btn btn-danger btn-sm" id="resetBtn">↺ Reset demo data</button>
+        <div class="stat-line"><span>Working days recorded</span><b>${DB.attDays.length}</b></div>
+        <div class="stat-line"><span>Database</span><b id="dbAdapter">checking…</b></div>
+        <p class="tiny muted">One deployment serves one school.${admin ? ' Use <a href="#provision">School Data</a> to load or replace its records.' : ''}</p>
+      </div></div>
+
+      <div class="card"><div class="card-head"><h3>Export</h3></div><div class="card-body col" style="gap:.7rem">
+        <p class="small muted">A full JSON backup, in the same shape the importer accepts — this file alone can re-create the deployment.</p>
+        <div class="row">
+          <button class="btn btn-ghost btn-sm" onclick="exportCSV()">⬇ Students CSV</button>
+          <button class="btn btn-ghost btn-sm" id="exportJson">⬇ Full backup (JSON)</button>
         </div>
       </div></div>
     </div>`;
@@ -1593,39 +1359,241 @@ ROUTES.settings = view => {
     applyTheme(b.dataset.t);
     document.querySelectorAll('#themeSeg button').forEach(x => x.classList.toggle('on', x === b));
   });
-  document.getElementById('setLang').onchange = e => {
-    Agent.lang = e.target.value; Store.set('agentLang', Agent.lang);
-    if (Agent.rec) Agent.rec.lang = Agent.lang;
-    const dockLang = document.getElementById('agLang');
-    if (dockLang) dockLang.value = Agent.lang;
-    toast('Speech recognition language updated.', 'ok');
-  };
-  document.getElementById('setTTS').onchange = e => {
-    Agent.speak = e.target.checked; Store.set('agentTTS', Agent.speak);
+
+  api('/health').then(h => {
+    const el = document.getElementById('dbAdapter');
+    if (el) el.textContent = h.adapter || 'none';
+  }).catch(() => {});
+
+  document.getElementById('pwSave').onclick = async () => {
+    const a = document.getElementById('pw1').value, b = document.getElementById('pw2').value;
+    if (a !== b) return toast('The two passwords do not match.', 'err');
+    if (a.length < 8) return toast('Use at least 8 characters.', 'err');
+    try {
+      await api('/password', { method: 'POST', body: { password: a } });
+      document.getElementById('pw1').value = document.getElementById('pw2').value = '';
+      toast('Password changed.', 'ok');
+    } catch (e) { toast(e.message, 'err'); }
   };
 
-  /* Ask the server whether it actually has an API key, rather than guessing. */
-  fetch('/api/agent', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ utterance: 'ping', context: { screen: 'healthcheck' } })
-  }).then(r => {
-    const el = document.getElementById('setAgentState');
-    if (!el) return;
-    if (r.ok) { el.textContent = 'Connected'; el.className = 'badge badge-ok'; }
-    else if (r.status === 503) { el.textContent = 'No API key on the server'; el.className = 'badge badge-warn'; }
-    else { el.textContent = 'Unreachable (HTTP ' + r.status + ')'; el.className = 'badge badge-danger'; }
-  }).catch(() => {
-    const el = document.getElementById('setAgentState');
-    if (el) { el.textContent = 'Not running through serve.js'; el.className = 'badge badge-warn'; }
+  if (admin) {
+    document.getElementById('spSave').onclick = async () => {
+      const val = k => document.getElementById('sp_' + k).value.trim();
+      const profile = { ...SCHOOL };
+      profileFields.forEach(([k]) => profile[k] = val(k));
+      if (!profile.name) return toast('The school needs a name.', 'err');
+      if (profile.yearWorkingDays) profile.yearWorkingDays = Number(profile.yearWorkingDays);
+      if (profile.minAttendance) profile.minAttendance = Number(profile.minAttendance);
+      try {
+        await api('/school', { method: 'PUT', body: profile });
+        SCHOOL = { ...SCHOOL, ...profile };
+        toast('School profile saved.', 'ok');
+        route();
+      } catch (e) { toast(e.message, 'err'); }
+    };
+  }
+
+  document.getElementById('exportJson').onclick = async () => {
+    try {
+      const data = await api('/data');
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${SCHOOL.code || 'school'}-backup-${todayISO()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast('Backup downloaded.', 'ok');
+    } catch (e) { toast(e.message, 'err'); }
+  };
+};
+
+/* ═══════════════════ SCHOOL DATA (provisioning) ═══════════════════
+   The screen an operator uses to stand a school up: load its data file,
+   see what that file contains before committing to it, and manage the
+   accounts the school signs in with.
+
+   Admin only — and enforced again on the server. A hidden sidebar entry
+   is a convenience, never a control. */
+ROUTES.provision = view => {
+  setHead('School Data', SCHOOL.name);
+  if (ROLE !== 'admin') { toast('Only an administrator can open that page.', 'warn'); location.hash = '#dashboard'; return; }
+
+  let staged = null;      // the parsed file, held back until the operator confirms
+
+  view.innerHTML = `
+    <div class="page-head"><div><h1>School Data</h1>
+      <p>Load this deployment's school from a data file, and manage its sign-ins.</p></div></div>
+
+    <div class="grid g2" style="gap:1.15rem">
+      <div class="card" style="grid-column:span 2"><div class="card-head"><h3>Import a school file</h3>
+        <span class="badge badge-accent">Replaces everything</span></div>
+        <div class="card-body col" style="gap:.9rem">
+        <p class="small muted">One JSON file holding the school profile, its roll, staff, marks, receipts and attendance.
+        The file is checked before anything is written: errors refuse the import outright, warnings are shown and the
+        import continues. Importing replaces every record this deployment currently holds.</p>
+        <div class="row">
+          <input type="file" id="bundleFile" accept="application/json" style="display:none">
+          <button class="btn btn-primary btn-sm" id="pickFile">📂 Choose file…</button>
+          <button class="btn btn-ghost btn-sm" id="loadDemo">🧪 Load the sample school</button>
+          <span class="tiny muted" id="fileName">no file chosen</span>
+        </div>
+        <div id="report"></div>
+      </div></div>
+
+      <div class="card" style="grid-column:span 2"><div class="card-head"><h3>Accounts</h3></div>
+        <div class="card-body col" style="gap:.9rem">
+        <div id="userList">loading…</div>
+        <div class="grid g2" style="gap:.7rem">
+          <div class="field"><label class="req" for="u_user">Username</label><input class="input" id="u_user" placeholder="kavitha"></div>
+          <div class="field"><label class="req" for="u_pass">Password</label><input class="input" type="password" id="u_pass" placeholder="at least 8 characters"></div>
+          <div class="field"><label class="req" for="u_name">Full name</label><input class="input" id="u_name" placeholder="M. Kavitha"></div>
+          <div class="field"><label for="u_title">Title</label><input class="input" id="u_title" placeholder="Class Teacher · X-A"></div>
+          <div class="field"><label class="req" for="u_role">Role</label>
+            <select class="select" id="u_role">${optList(['admin','principal','teacher','accountant','parent','student'])}</select></div>
+          <div class="field"><label for="u_sid">Student id (parent and student accounts)</label><input class="input" id="u_sid" placeholder="S4102"></div>
+        </div>
+        <div class="row"><button class="btn btn-primary btn-sm" id="addUser">Create account</button></div>
+      </div></div>
+
+      <div class="card" style="grid-column:span 2"><div class="card-head"><h3>Danger zone</h3></div>
+        <div class="card-body col" style="gap:.7rem">
+        <p class="small muted">Clearing removes the school profile and every record. Accounts are kept, so you are not
+        locked out of the instance you just cleared.</p>
+        <div class="row"><button class="btn btn-danger btn-sm" id="wipeBtn">Clear this school's data</button></div>
+      </div></div>
+    </div>`;
+
+  /* ---- choosing and checking a file ---- */
+  const reportEl = document.getElementById('report');
+  document.getElementById('pickFile').onclick = () => document.getElementById('bundleFile').click();
+
+  document.getElementById('bundleFile').onchange = async e => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    document.getElementById('fileName').textContent = `${file.name} · ${Math.round(file.size / 1024)} KB`;
+    let parsed;
+    try { parsed = JSON.parse(await file.text()); }
+    catch { staged = null; reportEl.innerHTML = `<div class="empty">That file is not valid JSON.</div>`; return; }
+    try {
+      const r = await api('/provision/validate', { method: 'POST', body: parsed });
+      staged = r.ok ? parsed : null;
+      renderReport(r, file.name);
+    } catch (err) { reportEl.innerHTML = `<div class="empty">${esc(err.message)}</div>`; }
+  };
+
+  function renderReport(r, fileName) {
+    const rows = Object.entries(r.summary || {})
+      .map(([k, v]) => `<div class="info-item"><span>${esc(k)}</span><b>${esc(v == null ? '—' : v)}</b></div>`).join('');
+    const list = (items, cls) => `<ul class="import-findings">${items.map(x => `<li class="${cls}">${esc(x)}</li>`).join('')}</ul>`;
+
+    reportEl.innerHTML = `
+      <div class="card" style="margin-top:.3rem"><div class="card-head">
+        <h3>${r.ok ? '✅ Ready to import' : '⛔ Refused'} — ${esc(fileName)}</h3></div>
+        <div class="card-body col" style="gap:.8rem">
+          <div class="info-grid">${rows}</div>
+          ${r.errors.length ? `<div><b>${r.errors.length} error${r.errors.length === 1 ? '' : 's'} — nothing will be written</b>${list(r.errors, 'bad')}</div>` : ''}
+          ${r.warnings.length ? `<div><b>${r.warnings.length} warning${r.warnings.length === 1 ? '' : 's'} — the import can still proceed</b>${list(r.warnings, '')}</div>` : ''}
+          ${r.ok ? `<div class="row"><button class="btn btn-primary btn-sm" id="doImport">Import this school</button></div>` : ''}
+        </div></div>`;
+
+    const btn = document.getElementById('doImport');
+    if (btn) btn.onclick = () => openModal({
+      title: 'Replace every record?',
+      body: `<p>This deployment holds <b>${DB.students.length}</b> students today. Importing <b>${esc(fileName)}</b>
+             replaces the school profile and every record with the contents of that file. Export a backup first if you
+             have not already.</p>`,
+      actions: [
+        { label: 'Cancel', cls: 'btn-ghost', fn: closeModal },
+        { label: 'Import and replace', cls: 'btn-danger', fn: async () => {
+            closeModal();
+            toast('Importing…', 'ok', 2000);
+            try {
+              const res = await api('/provision/import', { method: 'POST', body: staged });
+              await DB.load();
+              AI.bust();
+              toast(`Imported ${res.summary.students} students into ${res.summary.school}.`, 'ok', 5000);
+              route();
+            } catch (err) { toast('Import failed: ' + err.message, 'err', 6000); }
+          } }
+      ]
+    });
+  }
+
+  document.getElementById('loadDemo').onclick = () => openModal({
+    title: 'Load the sample school?',
+    body: `<p>This replaces everything in this deployment with the built-in sample school — 390 students whose records
+           carry deliberate defects, so the intelligence screens have something real to find. Every sample account uses
+           the password <code>demo</code>, so do not leave it running on a public URL.</p>`,
+    actions: [
+      { label: 'Cancel', cls: 'btn-ghost', fn: closeModal },
+      { label: 'Load sample school', cls: 'btn-danger', fn: async () => {
+          closeModal();
+          try {
+            const res = await api('/provision/demo', { method: 'POST' });
+            await DB.load();
+            AI.bust();
+            toast(`Sample school loaded — ${res.summary.students} students.`, 'ok', 5000);
+            route();
+          } catch (err) { toast('Failed: ' + err.message, 'err', 6000); }
+        } }
+    ]
   });
 
-  document.getElementById('resetBtn').onclick = () => openModal({
-    title: 'Reset demo data?',
-    body: `<p>This clears every student, mark, receipt and attendance record you have entered and restores the original sample data.</p>`,
+  /* ---- accounts ---- */
+  async function paintUsers() {
+    const host = document.getElementById('userList');
+    try {
+      const users = await api('/users');
+      host.innerHTML = `<table class="table"><thead><tr>
+          <th>Username</th><th>Name</th><th>Role</th><th>Linked student</th><th></th></tr></thead><tbody>
+        ${users.map(u => `<tr>
+          <td><b>${esc(u.username)}</b></td><td>${esc(u.name)}</td>
+          <td><span class="badge">${esc(u.role)}</span></td><td>${esc(u.sid || '—')}</td>
+          <td style="text-align:right">${u.username === (USER && USER.username)
+            ? '<span class="tiny muted">signed in</span>'
+            : `<button class="btn btn-quiet btn-sm" data-del="${esc(u.username)}">Remove</button>`}</td>
+        </tr>`).join('')}</tbody></table>`;
+      host.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
+        try {
+          await api('/users/' + encodeURIComponent(b.dataset.del), { method: 'DELETE' });
+          toast('Account removed.', 'ok');
+          paintUsers();
+        } catch (e) { toast(e.message, 'err'); }
+      });
+    } catch (e) { host.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+  }
+  paintUsers();
+
+  document.getElementById('addUser').onclick = async () => {
+    const v = id => document.getElementById(id).value.trim();
+    const body = { username: v('u_user'), password: v('u_pass'), name: v('u_name'),
+                   title: v('u_title'), role: v('u_role'), sid: v('u_sid') };
+    if (!body.username || !body.password || !body.name) return toast('Username, password and name are required.', 'err');
+    try {
+      await api('/users', { method: 'POST', body });
+      ['u_user','u_pass','u_name','u_title','u_sid'].forEach(id => document.getElementById(id).value = '');
+      toast('Account created.', 'ok');
+      paintUsers();
+    } catch (e) { toast(e.message, 'err'); }
+  };
+
+  document.getElementById('wipeBtn').onclick = () => openModal({
+    title: 'Clear this school’s data?',
+    body: `<p>Every student, mark, receipt and attendance record in this deployment is removed. Accounts are kept.
+           This cannot be undone — export a backup first.</p>`,
     actions: [
-      { label: 'Keep my data', cls: 'btn-ghost', fn: closeModal },
-      { label: 'Reset everything', cls: 'btn-danger', fn: () => { DB.reset(); AI.bust(); closeModal(); toast('Demo data restored.', 'ok'); route(); } }
+      { label: 'Keep the data', cls: 'btn-ghost', fn: closeModal },
+      { label: 'Clear everything', cls: 'btn-danger', fn: async () => {
+          closeModal();
+          try {
+            await api('/provision/wipe', { method: 'POST' });
+            await DB.load();
+            AI.bust();
+            toast('This deployment is now empty.', 'ok');
+            route();
+          } catch (e) { toast(e.message, 'err'); }
+        } }
     ]
   });
 };
@@ -1728,7 +1696,7 @@ ROUTES.insights = view => {
 
   view.innerHTML = `
     <div class="ai-hero"><div class="ai-hero-inner">
-      <div class="row" style="gap:.6rem">${AI_CHIP}<span class="badge badge-voice">On-device</span></div>
+      <div class="row" style="gap:.6rem">${AI_CHIP}<span class="badge badge-accent">On-device</span></div>
       <h1>Attendance Alerts</h1>
       <p>Aggregate attendance hides what matters. A child at 68% who is drifting down week by week and a
       child at 68% who missed one illness block are the same number and completely different problems.
@@ -1824,22 +1792,6 @@ ROUTES.insights = view => {
   document.getElementById('insSev').onchange = e => { insFilter.sev = e.target.value; paint(); };
   document.getElementById('insCls').onchange = e => { insFilter.cls = e.target.value; paint(); };
 
-  Agent.screen({
-    screen: 'insights',
-    label: 'Attendance Alerts',
-    description:
-      'Students whose day-by-day attendance shows a worrying pattern, ranked by risk, each with the ' +
-      'evidence behind the flag. Filter by how severe the pattern is and by standard.',
-    role: DEMO_USERS[ROLE].title,
-    routes: agentRoutes(),
-    controls: controlsFrom(document.querySelector('.toolbar'), {
-      insSev: 'how serious a pattern has to be to appear',
-      insCls: 'Roman numeral I to XII'
-    }),
-    actions: [
-      { id: 'export_actions', label: 'Export the action list', run: () => document.getElementById('insExport').click() }
-    ]
-  });
   document.getElementById('insExport').onclick = () => {
     const rows = [['Admission','Name','Class','Section','Roll','Guardian','Phone','Attendance %','Risk','Band','Patterns','Forecast']];
     all.forEach(r => rows.push([r.student.adm, r.student.name, r.student.cls, r.student.sec, r.student.roll,
@@ -1858,7 +1810,7 @@ ROUTES.dataquality = view => {
 
   view.innerHTML = `
     <div class="ai-hero"><div class="ai-hero-inner">
-      <div class="row" style="gap:.6rem">${AI_CHIP}<span class="badge badge-voice">On-device</span></div>
+      <div class="row" style="gap:.6rem">${AI_CHIP}<span class="badge badge-accent">On-device</span></div>
       <h1>Data Quality</h1>
       <p>Government returns are rejected wholesale for defects that are trivial to find beforehand.
       This runs the checks the UDISE+ upload will run — but now, against all ${q.total} records — and
@@ -1943,7 +1895,7 @@ ROUTES.scholarships = view => {
 
   view.innerHTML = `
     <div class="ai-hero"><div class="ai-hero-inner">
-      <div class="row" style="gap:.6rem">${AI_CHIP}<span class="badge badge-voice">On-device</span></div>
+      <div class="row" style="gap:.6rem">${AI_CHIP}<span class="badge badge-accent">On-device</span></div>
       <h1>Scholarship Match</h1>
       <p>Money these families are entitled to and routinely never claim, because nobody in the office has
       time to cross-check ${DB.students.length} records against ${AI.scholarships.SCHEMES.length} schemes with different income
@@ -2020,21 +1972,6 @@ ROUTES.scholarships = view => {
     });
   });
 
-  Agent.screen({
-    screen: 'scholarships',
-    label: 'Scholarship Match',
-    description:
-      'Which students qualify for which Tamil Nadu and Government of India scholarship schemes, with the ' +
-      'criteria each one passed or failed. Pick a student from the dropdown to see their full entitlement.',
-    role: DEMO_USERS[ROLE].title,
-    routes: agentRoutes(),
-    controls: controlsFrom(document.querySelector('.toolbar'), {
-      schStudent: 'each option is "name · class-section · roll"'
-    }),
-    actions: [
-      { id: 'export_claims', label: 'Export the claim list', run: () => document.getElementById('schExport').click() }
-    ]
-  });
 
   document.getElementById('schStudent').onchange = e => {
     const host = document.getElementById('schOne');
@@ -2102,33 +2039,44 @@ function downloadCSV(rows, filename) {
 }
 
 /* ═══════════════════════════ boot ═══════════════════════════ */
-paintNav();
-Agent.init();
-addEventListener('hashchange', route);
-
-document.getElementById('logoutBtn').onclick = () => { Store.del('session'); location.href = 'index.html'; };
-document.getElementById('voiceHelpTop').onclick = () => Agent.help();
-document.getElementById('sideToggle').onclick = () => {
-  const side = document.getElementById('appSide');
-  side.classList.add('open');
-  const scrim = document.createElement('div');
-  scrim.className = 'side-scrim';
-  scrim.onclick = () => { side.classList.remove('open'); scrim.remove(); };
-  document.body.appendChild(scrim);
-};
-document.getElementById('globalSearch').oninput = e => {
-  const q = e.target.value.trim();
-  if (q.length < 2) return;
-  stuFilter = { cls: '', sec: '', q, medium: '', community: '' };
-  if (!location.hash.startsWith('#students')) location.hash = '#students';
-  else route();
-};
-
-route();
-setTimeout(() => {
-  if (!Store.get('seenAgentTip')) {
-    Store.set('seenAgentTip', true);
-    toast('🎙 Talk to the assistant — press Ctrl+Shift+V any time.', 'voice', 6000);
-    document.getElementById('agentDock')?.classList.add('open');
+(async () => {
+  /* One round trip brings the session, the school profile and every
+     collection. A 401 means no session — api() has already redirected. */
+  try {
+    await DB.load();
+  } catch (e) {
+    document.getElementById('view').innerHTML =
+      `<div class="empty">Could not reach the school database.<br><small>${esc(e.message)}</small></div>`;
+    return;
   }
-}, 900);
+  ROLE = (USER && USER.role) || 'admin';
+
+  /* A deployment with no school loaded yet has nothing to show but the
+     screen that fixes that. */
+  if (!SCHOOL.provisioned && ROLE === 'admin' && !location.hash) location.hash = '#provision';
+
+  paintNav();
+  addEventListener('hashchange', route);
+
+  document.getElementById('logoutBtn').onclick = async () => {
+    try { await api('/logout', { method: 'POST' }); } catch { /* going anyway */ }
+    location.href = 'index.html';
+  };
+  document.getElementById('sideToggle').onclick = () => {
+    const side = document.getElementById('appSide');
+    side.classList.add('open');
+    const scrim = document.createElement('div');
+    scrim.className = 'side-scrim';
+    scrim.onclick = () => { side.classList.remove('open'); scrim.remove(); };
+    document.body.appendChild(scrim);
+  };
+  document.getElementById('globalSearch').oninput = e => {
+    const q = e.target.value.trim();
+    if (q.length < 2) return;
+    stuFilter = { cls: '', sec: '', q, medium: '', community: '' };
+    if (!location.hash.startsWith('#students')) location.hash = '#students';
+    else route();
+  };
+
+  route();
+})();

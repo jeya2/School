@@ -41,6 +41,12 @@ ehthumbs.db
 ~$*
 *.tmp
 
+# ── School database ─────────────────────────────────────────
+# SQLite lives in data/ and holds every student record — names, phone
+# numbers, Aadhaar. It is per-deployment state, never source. serve.js
+# also refuses to serve this directory over HTTP (see PRIVATE).
+data/
+
 # ── Logs & local output ─────────────────────────────────────
 *.log
 logs/
