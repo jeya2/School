@@ -72,9 +72,9 @@
           <span class="tiny muted mono">schoolx · principal dashboard</span>
         </div>
         <div class="art-stats">
-          <div class="art-stat"><b class="num">1,842</b><span>Students</span></div>
-          <div class="art-stat"><b class="num">94.6%</b><span>Attendance</span></div>
-          <div class="art-stat"><b class="num">₹38.2L</b><span>Collected</span></div>
+          <div class="art-stat"><b class="num" data-stat="students">&mdash;</b><span>Students</span></div>
+          <div class="art-stat"><b class="num" data-stat="attendance">&mdash;</b><span>Attendance</span></div>
+          <div class="art-stat"><b class="num" data-stat="collected">&mdash;</b><span>Collected</span></div>
         </div>
         <div class="art-bars">
           <i style="height:52%"></i><i style="height:74%"></i><i style="height:41%"></i>
@@ -85,7 +85,7 @@
       </div>
       <div class="float-badge fb-1">
         <div class="wave" style="height:20px"><i></i><i></i><i></i><i></i><i></i></div>
-        <span>“Student name — Karthik Raja”</span>
+        <span>“Attendance marked — Std X-A”</span>
       </div>
       <div class="float-badge fb-2">
         <span class="badge badge-ok"><i class="dot"></i>Saved</span>
@@ -99,10 +99,10 @@
 <section class="stat-strip">
   <div class="wrap">
     <div class="grid g4 stagger">
-      <div class="stat-item"><b class="num" data-count="1842">0</b><span>Students Enrolled</span></div>
-      <div class="stat-item"><b class="num" data-count="96">0</b><span>Teaching Staff</span></div>
-      <div class="stat-item"><b class="num" data-count="100" data-suffix="%">0</b><span>Std XII Pass 2025</span></div>
-      <div class="stat-item"><b class="num" data-count="27">0</b><span>Years of Service</span></div>
+      <div class="stat-item"><b class="num" data-stat="students">&mdash;</b><span>Students Enrolled</span></div>
+      <div class="stat-item"><b class="num" data-stat="staff">&mdash;</b><span>Teaching Staff</span></div>
+      <div class="stat-item"><b class="num" data-stat="classes">&mdash;</b><span>Classes</span></div>
+      <div class="stat-item"><b class="num" data-stat="year">&mdash;</b><span>Academic Year</span></div>
     </div>
   </div>
 </section>
@@ -113,9 +113,9 @@
     <div class="sec-head center">
       <p class="eyebrow">About the School</p>
       <h2>A neighbourhood school with a state-wide standard</h2>
-      <p class="lede">Founded in 1998 on Perundurai Road, Erode, School X serves 1,842 children from
-      Std I to Std XII across Tamil and English medium sections — with 100% RTE compliance and a
-      fully digitised office.</p>
+      <p class="lede">A Tamil Nadu State Board school teaching Std I to Std XII across Tamil and
+      English medium sections, with a fully digitised office — admissions, attendance, examinations
+      and fees kept in one place.</p>
     </div>
 
     <div class="grid g3 stagger">
@@ -134,36 +134,11 @@
       <div class="feat s">
         <div class="ico">🏅</div>
         <h4>Our Record</h4>
-        <p>100% pass in Std XII for four consecutive years, 12 district-level science fair prizes,
-           and a state-level kabaddi championship in 2024.</p>
+        <p>Board results, prizes and achievements are published here once the school declares
+           them. Nothing appears until the school's own records say so.</p>
       </div>
     </div>
 
-    <div class="grid g2" style="margin-top:2.4rem;align-items:stretch">
-      <div class="card card-pad">
-        <div class="row" style="gap:1rem;margin-bottom:1rem">
-          <div class="avatar avatar-lg" style="background:linear-gradient(135deg,var(--navy-700),var(--navy-500))">SR</div>
-          <div>
-            <h4 style="margin:0">Thiru. S. Ramanathan, M.A., B.Ed.</h4>
-            <span class="small muted">Correspondent</span>
-          </div>
-        </div>
-        <p class="small" style="color:var(--text-soft)">“We built this campus so that no child from our
-        town has to travel to Coimbatore for a good Plus Two. Twenty-seven years later, our alumni are
-        doctors, engineers, teachers and farmers — all of them ours.”</p>
-      </div>
-      <div class="card card-pad">
-        <div class="row" style="gap:1rem;margin-bottom:1rem">
-          <div class="avatar avatar-lg" style="background:linear-gradient(135deg,var(--teal-600),var(--teal-500))">LP</div>
-          <div>
-            <h4 style="margin:0">Tmt. L. Priyadharshini, M.Sc., M.Ed.</h4>
-            <span class="small muted">Principal</span>
-          </div>
-        </div>
-        <p class="small" style="color:var(--text-soft)">“Our teachers now spend their time teaching, not
-        filling registers. Attendance, marks and fee entries go in once, in the classroom itself.”</p>
-      </div>
-    </div>
   </div>
 </section>
 
@@ -284,17 +259,12 @@
       <p class="eyebrow">Board Results 2025</p>
       <h2>Our Std XII toppers</h2>
     </div>
-    <div class="grid g4 stagger" style="margin-bottom:2.4rem">
-      <div class="topper"><span class="crown">👑</span><div class="avatar avatar-lg">DK</div><b>Divya Krishnan</b><span class="small muted">Bio-Maths</span><div class="mark num">592<span style="font-size:.9rem;color:var(--text-mute)">/600</span></div></div>
-      <div class="topper"><div class="avatar avatar-lg" style="background:linear-gradient(135deg,var(--teal-600),var(--teal-500))">AM</div><b>Arun Mohan</b><span class="small muted">Computer Science</span><div class="mark num">587<span style="font-size:.9rem;color:var(--text-mute)">/600</span></div></div>
-      <div class="topper"><div class="avatar avatar-lg" style="background:linear-gradient(135deg,var(--saffron-600),var(--saffron-400))">SP</div><b>Sneha Priya</b><span class="small muted">Commerce</span><div class="mark num">581<span style="font-size:.9rem;color:var(--text-mute)">/600</span></div></div>
-      <div class="topper"><div class="avatar avatar-lg" style="background:linear-gradient(135deg,var(--rose-600),var(--rose-500))">VK</div><b>Vishnu Kumar</b><span class="small muted">Pure Science</span><div class="mark num">578<span style="font-size:.9rem;color:var(--text-mute)">/600</span></div></div>
-    </div>
-    <div class="grid g4 stagger">
-      <div class="card card-pad"><span class="small muted">Std XII Pass %</span><div style="font-family:var(--font-display);font-size:2rem;font-weight:750;color:var(--teal-600)">100%</div><div class="meter ok"><i style="width:100%"></i></div></div>
-      <div class="card card-pad"><span class="small muted">Std X Pass %</span><div style="font-family:var(--font-display);font-size:2rem;font-weight:750;color:var(--navy-700)">98.4%</div><div class="meter"><i style="width:98.4%"></i></div></div>
-      <div class="card card-pad"><span class="small muted">Centum Scores</span><div style="font-family:var(--font-display);font-size:2rem;font-weight:750;color:var(--saffron-600)">34</div><div class="meter warn"><i style="width:68%"></i></div></div>
-      <div class="card card-pad"><span class="small muted">Higher Ed. Placement</span><div style="font-family:var(--font-display);font-size:2rem;font-weight:750;color:var(--rose-600)">91%</div><div class="meter danger"><i style="width:91%"></i></div></div>
+    <!-- Board results are the school's own published record. They are not
+         invented here and not derived from the portal database: a result is
+         only true once the board has declared it. -->
+    <div class="card card-pad" style="max-width:640px;margin:0 auto;text-align:center">
+      <p class="small muted" style="margin:0">Std X and Std XII board results for this academic year
+      have not been published yet. They will appear here once the school declares them.</p>
     </div>
   </div>
 </section>
@@ -452,7 +422,15 @@ document.getElementById('burger').onclick = () =>
 document.querySelectorAll('.nav-links a').forEach(a =>
   a.onclick = () => document.getElementById('navLinks').classList.remove('open'));
 
-/* Count-up stats */
+/* Count-up stats.
+
+   Currently matches nothing, deliberately. The tiles it used to animate
+   held invented figures — a roll of 1,842, a 94.6% attendance rate — on a
+   build that serves whichever school the database holds. They are now
+   [data-stat] placeholders filled from /api/status, or left as an em dash.
+
+   Kept, not deleted: when a real number is wired up, give that element a
+   data-count and the animation returns. */
 const counters = document.querySelectorAll('[data-count]');
 const io = new IntersectionObserver(entries => {
   entries.forEach(e => {
@@ -526,6 +504,24 @@ api('/status').then(st => {
   if (st.school && st.school.name) {
     document.querySelectorAll('[data-school-name]').forEach(el => el.textContent = st.school.name);
     document.title = st.school.name;
+  }
+
+  /* Figures on this page come from the database or they do not appear.
+     The placeholders stay as an em dash until the deployment is
+     provisioned, because a public page inventing a roll size is a page
+     that will one day quote the wrong school's numbers back at it.
+
+     Only what /api/status already publishes is used. That endpoint is
+     deliberately thin — tests/server.test.js asserts it carries no
+     student records — so anything richer than this belongs behind the
+     login, not here. */
+  const fill = (key, value) => {
+    if (value === null || value === undefined || value === '') return;
+    document.querySelectorAll('[data-stat="' + key + '"]').forEach(el => el.textContent = value);
+  };
+  if (st.school) {
+    fill('year', st.school.year);
+    fill('classes', 'I–XII');
   }
 }).catch(() => {});
 
