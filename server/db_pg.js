@@ -14,13 +14,36 @@ const path = require('path');
 const { Pool } = require('pg');
 
 const connectionString = process.env.DATABASE_URL || process.env.PG_CONNECTION;
+
+/* ---------- TLS ----------
+   This connection carries every student record, and with an external
+   provider it crosses the public internet. So it VERIFIES the server
+   certificate by default.
+
+   That is a change from "accept any certificate", which was reasonable
+   when the database was a Fly-internal app with a self-signed cert, and
+   is wrong for the managed providers we now point at: Neon, Supabase,
+   Render and RDS all present publicly-trusted certificates, and
+   node:22-slim carries the root store to check them. Not verifying there
+   buys nothing and costs the whole confidentiality guarantee — anyone
+   able to intercept the connection could read the roll.
+
+     PGSSL unset      verify, when the connection string implies TLS
+     PGSSL=no-verify  encrypt but do not check the certificate — for a
+                      self-signed server only, and it is a real downgrade
+     PGSSL=disable    no TLS at all — local development only
+
+   A self-signed server now fails loudly at connect time instead of
+   silently accepting anything. That is the point. */
+const wantsTls = /sslmode=(require|verify-ca|verify-full)|render\.com|neon\.tech|supabase|amazonaws|\.tech|\.cloud/
+  .test(connectionString || '');
+
 const pool = new Pool({
   connectionString,
-  /* Hosted Postgres almost always terminates TLS with a certificate the
-     container does not have a root for. PGSSL=disable opts out entirely. */
   ssl: process.env.PGSSL === 'disable' ? false
-     : /sslmode=require|render\.com|neon\.tech|supabase|amazonaws/.test(connectionString || '')
-       ? { rejectUnauthorized: false } : undefined
+     : process.env.PGSSL === 'no-verify' ? { rejectUnauthorized: false }
+     : wantsTls ? { rejectUnauthorized: true }
+     : undefined
 });
 
 const COLLECTIONS = ['students', 'marks', 'receipts', 'notices', 'staff',

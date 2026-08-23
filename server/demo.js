@@ -26,12 +26,12 @@ const {
 /* The sample school's own identity. A real school supplies this in its
    data file; this is simply the one the demo ships with. */
 const DEMO_SCHOOL = {
-  name: 'New Gen Higher Secondary School',
-  short: 'New Gen Hr. Sec. School',
-  tamil: 'நியூ ஜென் மேல்நிலைப் பள்ளி',
+  name: 'School X',
+  short: 'School X',
+  tamil: 'ஸ்கூல் எக்ஸ்',
   addr: '142, Perundurai Road, Erode – 638 011, Tamil Nadu',
   phone: '0424 – 2260 145',
-  email: 'office@newgenhss.edu.in',
+  email: 'office@schoolx.edu.in',
   code: '33051',
   udise: '33071200812',
   year: '2026–27',

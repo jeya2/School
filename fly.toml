@@ -1,0 +1,76 @@
+# ============================================================
+#  fly.toml — School X
+# 
+#  ONE DEPLOYMENT SERVES ONE SCHOOL. This file describes School X's
+#  deployment and nothing else. A second school is a second Fly app, a
+#  second database and a second hostname — copy this file, change `app`,
+#  and change nothing else. There is no tenant column anywhere and this
+#  is what pays for that: schools are isolated by deployment.
+# 
+#  Region sin (Singapore). Fly.io HAS NO INDIA REGION — maa and bom are
+#  gone, so a Tamil Nadu school's records sit outside India. sin is the
+#  nearest at roughly 30-50ms from Chennai. The DPDP Act 2023 permits
+#  transfer to countries not on the government negative list, so this is
+#  lawful, but if in-India residency is required, Fly is the wrong host:
+#  use DigitalOcean Bangalore, AWS ap-south-1 or an Indian provider.
+# 
+#  Deploy with the sequence in design/runbook-schoolx.md.
+# ============================================================
+
+app = "schoolx"
+primary_region = "sin"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "5490"
+  NODE_ENV = "production"
+  # DATABASE_URL arrives as a secret — set it by hand from an external
+  # Postgres, or via `flyctl mpg attach`. Never put it here: this file is
+  # committed, and it is a database credential for children's records.
+
+[http_service]
+  internal_port = 5490
+  force_https = true
+
+  # ── DEMO POSTURE — scale to zero ────────────────────────────
+  # School X is a demo, so the machine sleeps when nobody is looking and
+  # you pay for the minutes it actually runs. First request after an idle
+  # period waits a few seconds while it wakes.
+  #
+  # FOR A REAL SCHOOL, FLIP THESE BACK:
+  #     auto_stop_machines   = "off"
+  #     min_machines_running = 1
+  # An office opening the portal at 09:00 must not wait for a cold start,
+  # and a stopped machine answers no health check, so the control plane
+  # cannot tell "asleep" from "broken".
+  #
+  # Note this interacts with the fleet view: an HTTP poll WAKES a sleeping
+  # machine. The console polls only when you press "Poll now" — its 30s
+  # auto-refresh re-reads the registry and never touches a school — so
+  # watching the fleet does not quietly undo scale-to-zero.
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 200
+    hard_limit = 250
+
+# Fly restarts the machine when this fails. /api/health is public and
+# answers 200 with {"ok":false} when the storage adapter did not load —
+# so this checks the process is alive, and the control plane's fleet view
+# is what tells you the database is actually there. The two are different
+# questions and are deliberately answered in different places.
+[[http_service.checks]]
+  interval = "30s"
+  timeout = "5s"
+  grace_period = "20s"
+  method = "GET"
+  path = "/api/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

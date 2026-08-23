@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>BrightNeuron Labs — A.I. driven school management</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap">
+
+<!-- ============================================================
+     The export sheet. Same design as the web pamphlet, laid out on a
+     fixed 1080 × 1920 canvas — the 9:16 shape WhatsApp shows without
+     cropping, and the size it will not recompress into mush.
+
+     Rendered with:  node marketing/render.js
+     Produces:       marketing/school-ai-poster.png
+                     marketing/school-ai-poster.pdf
+
+     The PDF page is set to the same proportions as the image on purpose,
+     so a recipient who opens either one sees exactly the same sheet.
+     ============================================================ -->
+<style>
+  :root {
+    --ink:        #0D1826;
+    --ink-2:      #142438;
+    --ink-3:      #1E3450;
+    --paper:      #EDF1F5;
+    --paper-soft: #A8BACB;
+    --paper-mute: #7C93A6;
+
+    --turmeric:   #E8A33D;
+    --turmeric-d: #B87A22;
+    --teal:       #2A9D8F;
+    --alert:      #E05252;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html, body { margin: 0; padding: 0; }
+
+  body {
+    width: 1080px;
+    height: 1920px;
+    background:
+      radial-gradient(120% 55% at 50% -8%, rgba(232,163,61,.13), transparent 62%),
+      var(--ink);
+    color: var(--paper);
+    font-family: 'Archivo', system-ui, 'Segoe UI', sans-serif;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+
+  .sheet {
+    width: 1080px;
+    height: 1920px;
+    padding: 74px 80px 62px;
+    display: flex;
+    flex-direction: column;
+    gap: 38px;
+  }
+
+  p { margin: 0; }
+
+  /* ---------- masthead ---------- */
+  .brand {
+    display: flex; align-items: center; gap: 16px;
+    font-size: 25px; font-weight: 700;
+    letter-spacing: .22em; text-transform: uppercase;
+    color: var(--paper-mute);
+  }
+  .brand .mark {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: var(--turmeric);
+    box-shadow: 0 0 0 9px rgba(232,163,61,.18);
+    flex: none;
+  }
+
+  h1 {
+    font-family: 'Instrument Serif', Georgia, serif;
+    font-weight: 400;
+    font-size: 94px;
+    line-height: .98;
+    letter-spacing: -.02em;
+    margin: 0;
+  }
+  h1 .ai { display: block; font-style: italic; color: var(--turmeric); }
+
+  .sub {
+    font-size: 29px;
+    line-height: 1.42;
+    color: var(--paper-soft);
+    margin-top: 26px;
+  }
+
+  /* ---------- hero illustration ---------- */
+  .hero {
+    background: var(--ink-2);
+    border: 2px solid var(--ink-3);
+    border-radius: 28px;
+    padding: 30px 30px 26px;
+    display: flex; flex-direction: column; gap: 20px;
+  }
+  .hero svg { width: 100%; height: auto; display: block; }
+  .hero-cap {
+    display: flex; gap: 18px; align-items: flex-start;
+    font-size: 25px; line-height: 1.4; color: var(--paper-soft);
+  }
+  .hero-cap b { color: var(--paper); font-weight: 600; }
+  .hero-cap .pip {
+    width: 16px; height: 16px; border-radius: 50%; flex: none; margin-top: 12px;
+    background: var(--alert);
+    box-shadow: 0 0 0 7px rgba(224,82,82,.22);
+  }
+
+  /* ---------- features ---------- */
+  .features { display: flex; flex-direction: column; gap: 30px; }
+  .feature { display: flex; gap: 26px; align-items: flex-start; }
+  .feature .glyph {
+    width: 64px; height: 64px; flex: none;
+    border-radius: 20px;
+    background: rgba(232,163,61,.12);
+    border: 2px solid rgba(232,163,61,.34);
+    display: grid; place-items: center;
+    color: var(--turmeric);
+  }
+  .feature.lead .glyph {
+    background: rgba(224,82,82,.15);
+    border-color: rgba(224,82,82,.44);
+    color: #FF8F8F;
+  }
+  .feature h2 {
+    margin: 0 0 8px;
+    font-size: 34px; font-weight: 700; letter-spacing: -.01em;
+    color: var(--paper);
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  }
+  .feature h2 .tag {
+    font-size: 20px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+    color: #FFC9C9; background: rgba(224,82,82,.24);
+    padding: 6px 12px; border-radius: 8px;
+  }
+  .feature p { font-size: 25px; line-height: 1.42; color: var(--paper-soft); }
+
+  .rule { height: 2px; background: var(--ink-3); border: 0; margin: 0; }
+
+  /* ---------- call to action ---------- */
+  .cta { margin-top: auto; display: flex; flex-direction: column; gap: 26px; }
+  .btn {
+    display: block; text-align: center; text-decoration: none;
+    background: linear-gradient(150deg, var(--turmeric), var(--turmeric-d));
+    color: #21160A; font-weight: 700; font-size: 36px;
+    padding: 26px 32px; border-radius: 22px;
+    box-shadow: 0 26px 60px -28px rgba(232,163,61,.85);
+  }
+  .btn .url {
+    display: block; font-family: 'JetBrains Mono', monospace;
+    font-size: 23px; font-weight: 400; opacity: .78; margin-top: 7px;
+  }
+  .assure {
+    text-align: center; font-size: 23px; line-height: 1.42; color: var(--paper-mute);
+  }
+  .assure b { color: var(--teal); font-weight: 600; }
+
+  /* The PDF keeps the poster's proportions rather than snapping to A4, so
+     the two files are the same sheet. 1080 × 1920 px at 96dpi. */
+  @page { size: 285.75mm 508mm; margin: 0; }
+</style>
+</head>
+<body>
+
+<div class="sheet">
+
+  <header>
+    <p class="brand"><span class="mark"></span>BrightNeuron Labs</p>
+  </header>
+
+  <div>
+    <h1><span class="ai">A.I. driven</span>school management system.</h1>
+    <p class="sub">
+      Admissions, attendance, examinations, fees and government returns — with
+      intelligence built into every one of them. It reads your own records and tells you
+      which child needs you, today.
+    </p>
+  </div>
+
+  <section class="hero">
+    <svg viewBox="0 0 400 152" role="img"
+         aria-label="A seating chart of a whole school. Every pupil is a mark; one is flagged and ringed in red.">
+      <defs>
+        <radialGradient id="spot" cx="50%" cy="50%" r="50%">
+          <stop offset="0%"   stop-color="#E05252" stop-opacity=".38"/>
+          <stop offset="100%" stop-color="#E05252" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <g id="chart"></g>
+    </svg>
+
+    <p class="hero-cap">
+      <span class="pip"></span>
+      <span><b>One pupil in three hundred and ninety.</b> Found on a Tuesday morning —
+      not in the results at the end of the year.</span>
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <section class="features">
+    <article class="feature lead">
+      <span class="glyph">
+        <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 8a6 6 0 1 0-12 0c0 6-3 7-3 7h18s-3-1-3-7"/>
+          <path d="M10.5 20a1.9 1.9 0 0 0 3 0"/>
+        </svg>
+      </span>
+      <div>
+        <h2>Student Alert System <span class="tag">Per child</span></h2>
+        <p>Watches every pupil day by day, not as a percentage. Two children on the same
+        68% are not the same problem — it knows which one has quietly stopped coming, and
+        warns you who will miss the 75% exam bar while there is still time to act.</p>
+      </div>
+    </article>
+
+    <article class="feature">
+      <span class="glyph">
+        <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 3h6v3H9z"/>
+          <path d="M15 4.5h3A1.5 1.5 0 0 1 19.5 6v13A1.5 1.5 0 0 1 18 20.5H6A1.5 1.5 0 0 1 4.5 19V6A1.5 1.5 0 0 1 6 4.5h3"/>
+          <path d="M8.5 13l2.5 2.5 4.5-5"/>
+        </svg>
+      </span>
+      <div>
+        <h2>Data Quality</h2>
+        <p>Finds what UDISE+ would reject — before you upload, down to the exact pupil and
+        the exact field.</p>
+      </div>
+    </article>
+
+    <article class="feature">
+      <span class="glyph">
+        <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9"/>
+          <path d="M9.2 8h5.6M9.2 11h5.6M13.4 8c1.6 0 2.2 1.2 2.2 2.4 0 1.6-1.1 2.6-3 2.6H9.6l4 4"/>
+        </svg>
+      </span>
+      <div>
+        <h2>Scholarship Match</h2>
+        <p>Matches every pupil against Tamil Nadu and Government of India schemes, so
+        families stop missing money they are entitled to.</p>
+      </div>
+    </article>
+  </section>
+
+  <section class="cta">
+    <a class="btn" href="https://brightneuronlabs.ca/apps/school/">
+      See it working
+      <span class="url">brightneuronlabs.ca/apps/school</span>
+    </a>
+    <p class="assure"><b>Nothing about a child leaves your school.</b> Every engine runs on
+    your own data, on your own system.</p>
+  </section>
+</div>
+
+<script>
+  /* One mark per pupil, laid out the way a school thinks about itself. Most are
+     steady, a handful are worth a look, exactly one has stopped coming. Fixed
+     pattern, so every export is identical. */
+  var COLS = 20, ROWS = 6, X0 = 14, Y0 = 16, DX = 19.4, DY = 19.6, R = 5.2;
+  var FLAG = { col: 12, row: 3 };
+  var watch = [3, 17, 26, 48, 61, 74, 89, 96, 110, 118, 131];
+
+  var svgns = 'http://www.w3.org/2000/svg';
+  var chart = document.getElementById('chart');
+  var fx = X0 + FLAG.col * DX, fy = Y0 + FLAG.row * DY;
+
+  function el(name, attrs) {
+    var node = document.createElementNS(svgns, name);
+    for (var k in attrs) node.setAttribute(k, attrs[k]);
+    return node;
+  }
+
+  chart.appendChild(el('circle', { cx: fx, cy: fy, r: 52, fill: 'url(#spot)' }));
+
+  var i = 0;
+  for (var r = 0; r < ROWS; r++) {
+    for (var c = 0; c < COLS; c++, i++) {
+      var isFlag = (c === FLAG.col && r === FLAG.row);
+      var isWatch = watch.indexOf(i) > -1;
+      chart.appendChild(el('circle', {
+        cx: X0 + c * DX, cy: Y0 + r * DY, r: isFlag ? R + 1.1 : R,
+        fill: isFlag ? '#E05252' : isWatch ? 'rgba(217,164,65,.75)' : 'rgba(42,157,143,.5)'
+      }));
+    }
+  }
+
+  /* A still export cannot pulse, so the ring is drawn at a fixed strength. */
+  chart.appendChild(el('circle', {
+    cx: fx, cy: fy, r: 16, fill: 'none',
+    stroke: '#E05252', 'stroke-width': 1.4, opacity: .42
+  }));
+
+  chart.appendChild(el('path', {
+    d: 'M' + (fx + 17) + ' ' + (fy - 8) + ' L' + (fx + 34) + ' ' + (fy - 26),
+    stroke: '#E05252', 'stroke-width': 1.2, fill: 'none', opacity: .8
+  }));
+  var label = el('text', {
+    x: fx + 38, y: fy - 27, fill: '#FF9C9C',
+    'font-family': 'JetBrains Mono, monospace', 'font-size': '9.5'
+  });
+  label.textContent = 'Std X-A · Roll 21';
+  chart.appendChild(label);
+
+  document.documentElement.setAttribute('data-drawn', '1');   // the renderer waits for this
+</script>
+</body>
+</html>

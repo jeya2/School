@@ -129,7 +129,7 @@ function cleanup() {
   ok('the sample school imports', demo.status === 200, `${demo.data.summary?.students} students`);
 
   const boot = await call(admin, 'GET', '/api/bootstrap');
-  ok('bootstrap returns the school', boot.data.school.name === 'New Gen Higher Secondary School');
+  ok('bootstrap returns the school', boot.data.school.name === 'School X');
   ok('bootstrap returns the roll', boot.data.data.students.length === 390);
   ok('bootstrap returns marks', Object.keys(boot.data.data.marks).length > 3000);
   ok('the anchor student survived the round trip',

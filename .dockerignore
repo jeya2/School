@@ -1,5 +1,4 @@
 node_modules
-data
 .git
 .github
 .env
@@ -8,3 +7,28 @@ data
 tests
 *.log
 .claude
+
+# ── Never in a school image ─────────────────────────────────
+# A school's database. `data` alone matches only the top level, so the
+# glob is spelled out — a stray nested data/ directory would otherwise
+# be copied into the image.
+data
+**/data
+
+# The control plane. It is a SEPARATE deployment that merely shares this
+# repository, and it has no business on a school's machine:
+#
+#   • sysadmin/data/registry.db holds the operator's password hash, TOTP
+#     secret and recovery-code hashes — the credentials guarding EVERY
+#     school. .gitignore keeps it out of git, but a Docker build context
+#     ignores .gitignore entirely, so without this line it ships.
+#   • serve.js already refuses to serve /sysadmin over HTTP (PRIVATE),
+#     but code that is not in the image cannot be served, executed or
+#     read at all.
+#
+# See sysadmin/README.md rule 1: the dependency arrow points one way.
+sysadmin
+
+# Documentation and artwork — no reason to be in a running container.
+design
+marketing

@@ -38,14 +38,14 @@ let USER = null;
    would go stale the moment another user saved, and a shared office
    machine would leak one school's data into the next session. */
 const Store = {
-  key: k => 'ngss.' + k,
+  key: k => 'portal.' + k,
   get(k, fallback = null) {
     try { const v = localStorage.getItem(this.key(k)); return v === null ? fallback : JSON.parse(v); }
     catch { return fallback; }
   },
   set(k, v) { try { localStorage.setItem(this.key(k), JSON.stringify(v)); } catch (e) { console.warn(e); } },
   del(k) { localStorage.removeItem(this.key(k)); },
-  clearAll() { Object.keys(localStorage).filter(k => k.startsWith('ngss.')).forEach(k => localStorage.removeItem(k)); }
+  clearAll() { Object.keys(localStorage).filter(k => k.startsWith('portal.')).forEach(k => localStorage.removeItem(k)); }
 };
 
 /* ---------- API helper ----------

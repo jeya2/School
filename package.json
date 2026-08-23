@@ -1,12 +1,13 @@
 {
-  "name": "newgen-hss-portal",
+  "name": "school-portal",
   "version": "2.0.0",
   "private": true,
   "description": "Database-driven student management portal for schools, with on-device intelligence for attendance risk, data quality and scholarship matching.",
   "license": "MIT",
   "scripts": {
     "start": "node serve.js",
-    "test": "node tests/ai.test.js && node tests/server.test.js",
+    "test": "node tests/ai.test.js && node tests/server.test.js && node tests/sysadmin.test.js",
+    "sysadmin": "node sysadmin/serve.js",
     "provision": "node server/provision.js"
   },
   "dependencies": {

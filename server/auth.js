@@ -23,7 +23,10 @@ const crypto = require('crypto');
 
 const SCRYPT = { N: 16384, r: 8, p: 1, keylen: 64 };
 const SESSION_DAYS = Number(process.env.SESSION_DAYS || 7);
-const COOKIE = 'ngss_session';
+/* Not named after any school. The same build serves whichever school the
+   database holds, so a school-branded cookie was always the wrong shape —
+   it just happened to match the one the demo shipped with. */
+const COOKIE = 'portal_session';
 
 function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
   const hash = crypto.scryptSync(String(password), salt, SCRYPT.keylen, SCRYPT).toString('hex');

@@ -45,6 +45,12 @@ ehthumbs.db
 # SQLite lives in data/ and holds every student record — names, phone
 # numbers, Aadhaar. It is per-deployment state, never source. serve.js
 # also refuses to serve this directory over HTTP (see PRIVATE).
+#
+# The pattern is deliberately UNANCHORED, so it also catches
+# sysadmin/data/ — the control plane's registry, which holds the
+# operator's password hash, TOTP secret and recovery-code hashes.
+# Do not "tidy" this to /data/: that would leave every credential
+# guarding every school sitting in the next commit.
 data/
 
 # ── Logs & local output ─────────────────────────────────────

@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Control plane</title>
+<link rel="stylesheet" href="assets/css/console.css">
+</head>
+<body>
+
+<!-- Deliberately says nothing about what this administers, who runs it or
+     how many schools are behind it. An unauthenticated visitor learns that
+     something here wants a password, and no more. -->
+
+<div class="login-wrap">
+  <form class="login" id="form" autocomplete="off">
+    <h1 id="heading">Sign in</h1>
+    <p class="sub" id="sub">Administration console.</p>
+
+    <div class="msg err" id="msg"></div>
+
+    <div id="step1">
+      <div class="field">
+        <label for="u">Username</label>
+        <input class="input" id="u" name="username" autocomplete="username" autocapitalize="off" spellcheck="false" required>
+      </div>
+      <div class="field">
+        <label for="p">Password</label>
+        <input class="input" id="p" name="password" type="password" autocomplete="current-password" required>
+      </div>
+    </div>
+
+    <div id="step2" style="display:none">
+      <div class="field">
+        <label for="c">Authentication code</label>
+        <input class="input code" id="c" inputmode="text" autocomplete="one-time-code"
+               spellcheck="false" maxlength="14" placeholder="······">
+      </div>
+      <p class="note" style="margin-bottom:16px">
+        Six digits from your authenticator, or one recovery code.
+      </p>
+    </div>
+
+    <button class="btn" id="go" type="submit">Continue</button>
+  </form>
+</div>
+
+<script>
+/* Two steps, always. A password alone never yields a session — the server
+   answers step 1 with a challenge cookie, not a login. */
+const $ = id => document.getElementById(id);
+let step = 1;
+
+function say(text, kind = 'err') {
+  const m = $('msg');
+  m.textContent = text;
+  m.className = 'msg ' + kind + (text ? ' show' : '');
+}
+
+async function post(path, body) {
+  const res = await fetch(path, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    cache: 'no-store'
+  });
+  let data = null;
+  try { data = await res.json(); } catch { /* empty body */ }
+  return { res, data };
+}
+
+function toStep2() {
+  step = 2;
+  /* Disable, do not merely hide. A `required` field that is display:none
+     and empty fails constraint validation, and the browser cannot focus
+     it to say so — the form silently refuses to submit and the click
+     appears to do nothing at all. Disabled controls are barred from
+     validation, so this keeps step 1's validation without breaking
+     step 2's submit. */
+  $('u').disabled = true;
+  $('p').disabled = true;
+  $('c').required = true;
+  $('step1').style.display = 'none';
+  $('step2').style.display = '';
+  $('heading').textContent = 'Second factor';
+  $('sub').textContent = 'The password was accepted. One more step.';
+  $('go').textContent = 'Verify';
+  say('');
+  $('c').focus();
+}
+
+$('form').addEventListener('submit', async e => {
+  e.preventDefault();
+  $('go').disabled = true;
+  try {
+    if (step === 1) {
+      const { res, data } = await post('/api/login', {
+        username: $('u').value.trim(),
+        password: $('p').value
+      });
+      /* SYSADMIN_SKIP_2FA: the server issued a session outright. */
+      if (res.ok && data && data.bypassed) { location.replace('app.html'); return; }
+      if (res.ok && data && data.challenge) { $('p').value = ''; return toStep2(); }
+      say((data && data.message) || 'Sign in failed.');
+    } else {
+      const { res, data } = await post('/api/login/verify', { code: $('c').value.trim() });
+      if (res.ok) {
+        /* A spent recovery code is worth knowing about immediately — it
+           means the authenticator did not work, and one of ten is gone. */
+        /* A browser with site data blocked throws here; that must not be
+           allowed to swallow the redirect into a working session. */
+        try { if (data && data.warnRecovery) sessionStorage.setItem('bnl.recoveryUsed', '1'); } catch {}
+        location.replace('app.html');
+        return;
+      }
+      say((data && data.message) || 'That code is not right.');
+      $('c').value = '';
+      $('c').focus();
+      /* The server ends the challenge after three wrong codes or five
+         minutes; when it does, go back rather than leave a dead form. */
+      if (data && ['expired', 'exhausted', 'no_challenge', 'rebound'].includes(data.error)) {
+        setTimeout(() => location.reload(), 1600);
+      }
+    }
+  } catch {
+    say('Could not reach the control plane.');
+  } finally {
+    $('go').disabled = false;
+  }
+});
+
+/* If an operator has not been created yet, say so — the alternative is a
+   login form that can never succeed and gives no clue why. */
+fetch('/api/status', { cache: 'no-store' })
+  .then(r => r.json())
+  .then(s => {
+    if (s && s.ready === false) {
+      say('No operator exists yet. Run: node sysadmin/setup.js init <username>', 'warn');
+      $('go').disabled = true;
+      return;
+    }
+    if (s && s.noSecondFactor) {
+      say('Two-factor sign-in is OFF (SYSADMIN_SKIP_2FA=1). Local testing only.', 'warn');
+      $('sub').textContent = 'Administration console — password only.';
+    }
+  })
+  .catch(() => {});
+</script>
+</body>
+</html>

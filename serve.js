@@ -67,7 +67,12 @@ const PORT = Number(process.argv[2]) || Number(process.env.PORT) || 5490;
 const HOST = process.env.HOST || (process.env.PORT ? '0.0.0.0' : '127.0.0.1');
 
 /* Never serve these over HTTP, whatever the URL says. */
-const PRIVATE = ['server', 'node_modules', 'tests', '.git', '.env', 'data', 'migrations'];
+/* sysadmin/ is the control plane — a separate deployment that happens to share
+   this repository. A school's server must never serve it, and never require it:
+   the dependency arrow points one way, so a school deployment cannot be tricked
+   into executing control-plane code. */
+const PRIVATE = ['server', 'node_modules', 'tests', '.git', '.env', 'data',
+                 'migrations', 'sysadmin'];
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',

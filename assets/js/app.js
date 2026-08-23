@@ -412,7 +412,7 @@ function exportCSV() {
     cols.map(c => `"${String(s[c] ?? '').replace(/"/g, '""')}"`).join(','))].join('\n');
   const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
   const a = document.createElement('a');
-  a.href = url; a.download = `newgen-students-${todayISO()}.csv`; a.click();
+  a.href = url; a.download = `students-${todayISO()}.csv`; a.click();
   URL.revokeObjectURL(url);
   toast('Exported ' + DB.students.length + ' student records.', 'ok');
 }

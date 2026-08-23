@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Fleet — control plane</title>
+<link rel="stylesheet" href="assets/css/console.css">
+</head>
+<body>
+
+<header class="top">
+  <h1>Control plane</h1>
+  <span class="badge stage">stage 1 · read only</span>
+  <span class="spacer"></span>
+  <span class="badge" id="who">—</span>
+  <button class="btn btn-ghost" id="signout">Sign out</button>
+</header>
+
+<main>
+  <div class="msg warn" id="recoveryWarn">
+    You signed in with a recovery code. One of ten is now spent — if that was not
+    deliberate, your authenticator is out of sync or your phone is gone.
+    Re-issue the set with <code>node sysadmin/setup.js recovery &lt;username&gt;</code>.
+  </div>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Fleet</h2>
+      <span class="badge" id="count">—</span>
+      <span class="spacer"></span>
+      <span class="tiny muted" id="lastPoll"></span>
+      <button class="btn btn-ghost" id="poll">Poll now</button>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Status</th><th>Id</th><th>School</th><th>URL</th>
+            <th>Adapter</th><th>Version</th><th>Year</th><th>Latency</th><th>Checked</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="fleet"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="fleetEmpty" style="display:none">
+      No schools registered yet.
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><h2>Register a deployment</h2></div>
+    <div class="panel-body">
+      <div class="row">
+        <div class="field">
+          <label for="nid">Id</label>
+          <input class="input" id="nid" placeholder="schoolx" spellcheck="false">
+        </div>
+        <div class="field">
+          <label for="nname">Name</label>
+          <input class="input" id="nname" placeholder="St. Xavier's Hr. Sec.">
+        </div>
+        <div class="field" style="flex:2">
+          <label for="nurl">URL</label>
+          <input class="input" id="nurl" placeholder="https://schoolx.brightneuronlabs.ca" spellcheck="false">
+        </div>
+        <button class="btn" id="add">Register</button>
+      </div>
+      <p class="note" style="margin-top:14px">
+        This records where a deployment lives so it can be watched. It does not
+        create, deploy or modify anything — provisioning is stage 4.
+      </p>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Audit</h2>
+      <span class="spacer"></span>
+      <span class="tiny muted">append-only · most recent first</span>
+    </div>
+    <div class="scroll">
+      <table class="audit">
+        <thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Target</th><th>Detail</th><th>IP</th></tr></thead>
+        <tbody id="audit"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script src="assets/js/console.js"></script>
+</body>
+</html>
