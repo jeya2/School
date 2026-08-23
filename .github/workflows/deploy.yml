@@ -1,0 +1,107 @@
+# ============================================================
+#  Deploy School X to Fly.io
+#
+#  Push to main -> run the tests -> deploy, but ONLY if they passed.
+#
+#  The gate is the point. This portal holds children's records, and the
+#  suite covers the role boundaries and the "public status carries no
+#  student records" leakage check. A deploy that skips them can put a
+#  broken permission check in front of a school's roll.
+#
+#  ONE DEPLOYMENT SERVES ONE SCHOOL. This workflow deploys School X and
+#  nothing else. A second school is a second app with its own token; copy
+#  this file, change the app name and the secret it reads.
+#
+#  Setup, once:
+#    flyctl tokens create deploy --app schoolx --name github-actions-schoolx --expiry 2160h
+#    gh secret set FLY_API_TOKEN --repo jeya2/School
+#
+#  NOTE FOR LATER: this deploys on every push to main, which is right for
+#  a demo and questionable for a live school — a typo pushed at 14:00 is
+#  a portal down during office hours. When a paying school depends on
+#  this, switch the trigger to tags (on: push: tags: ['v*']) or put the
+#  deploy job behind a GitHub Environment with a required reviewer.
+# ============================================================
+name: Deploy School X
+
+on:
+  push:
+    branches: [main]
+  # A "Run workflow" button in the Actions tab, so a redeploy does not
+  # need an empty commit.
+  workflow_dispatch:
+
+# Two deploys racing against one app is how a machine ends up half
+# updated. Queue them instead; never cancel one mid-flight.
+concurrency:
+  group: deploy-schoolx
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 22 matches the Dockerfile's node:22-slim, so the tests run on
+      # the runtime production actually uses — not the Node 21 on the
+      # developer's machine.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # better-sqlite3 is an optionalDependency and a native addon. If it
+      # did not load, tests/server.test.js and tests/sysadmin.test.js skip
+      # themselves by design rather than failing — so print the answer
+      # instead of wondering why the assertion count dropped.
+      - name: Report storage adapter availability
+        run: |
+          node -e "try{require('better-sqlite3');console.log('better-sqlite3: LOADS on Node '+process.version)}catch(e){console.log('better-sqlite3: NOT AVAILABLE on Node '+process.version+' — sqlite-backed tests will SKIP');console.log('  '+String(e.message).split('\n')[0])}"
+
+      - run: npm test
+
+  deploy:
+    name: Deploy
+    needs: test          # the gate — no deploy unless the suite passed
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      # --remote-only builds on Fly's builders, so the runner needs no
+      # Docker. flyctl reports this is already the default; stated
+      # explicitly so the intent survives a change to that default.
+      - run: flyctl deploy --remote-only
+        env:
+          # Scoped to the schoolx app alone. If it leaks, the blast radius
+          # is one school, not the whole Fly organisation.
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Verify the deployment is actually serving
+        run: |
+          health=''
+          for i in 1 2 3 4 5 6; do
+            health=$(curl -fsS https://schoolx.fly.dev/api/health) && break
+            echo "attempt $i: no answer yet (the machine may be waking)"; sleep 10
+          done
+          echo "health: $health"
+
+          # `ok` is NOT sufficient. It reports whether the adapter MODULE
+          # loaded, not whether the database works — a malformed
+          # DATABASE_URL yields {"ok":true, storeError:"database ... does
+          # not exist"}. That exact mistake reached production once,
+          # from a connection string missing the "?" before sslmode.
+          echo "$health" | grep -q '"storeError":null' \
+            || { echo "::error::storeError is set — the database is not usable"; exit 1; }
+
+          # /api/status reads the database (countUsers + getSchool), so a
+          # 200 here means it genuinely works rather than merely loaded.
+          code=$(curl -s -o /dev/null -w '%{http_code}' https://schoolx.fly.dev/api/status)
+          echo "status: HTTP $code"
+          [ "$code" = "200" ] \
+            || { echo "::error::/api/status returned $code — the app is up but not serving"; exit 1; }
