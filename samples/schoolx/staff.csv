@@ -1,0 +1,15 @@
+id,name,role,subject,cls,qual,phone,joined
+# The staff register. Teachers for every class on the roll, plus the office.
+T01,M. Kavitha,Teacher,Mathematics,X-A,"M.Sc., B.Ed.",9843012301,2012-06-04
+T02,S. Ravichandran,Teacher,Physics,XII-A,"M.Sc., M.Ed.",9843012302,2009-06-08
+T03,A. Bhuvaneswari,Teacher,Tamil,IX-A,"M.A., B.Ed.",9843012303,2015-06-15
+T04,K. Elangovan,Teacher,Chemistry,XI-A,"M.Sc., B.Ed.",9843012304,2011-07-01
+T05,R. Jayanthi,Teacher,English,VIII-A,"M.A., B.Ed.",9843012305,2017-06-12
+T06,P. Marimuthu,Teacher,Social Science,VII-A,"M.A., B.Ed.",9843012306,2013-06-10
+T07,N. Thangavel,Teacher,Computer Science,XI-B,"M.C.A., B.Ed.",9843012308,2018-06-04
+T08,G. Punitha,Teacher,Primary,V-A,D.T.Ed.,9843012309,2014-06-09
+T09,D. Sivakumar,Teacher,Physical Education,—,M.P.Ed.,9843012310,2010-06-14
+A01,R. Saravanan,Admin,Office,—,B.Com.,9843012311,2008-04-01
+A02,P. Elangovan,Accountant,Accounts,—,M.Com.,9843012312,2011-04-01
+A03,L. Priyadharshini,Principal,Administration,—,"M.Sc., M.Ed.",9843012300,2006-06-01
+A04,S. Malathi,Librarian,Library,—,M.L.I.Sc.,9843012313,2019-06-03

@@ -1,0 +1,17 @@
+id,no,sid,name,cls,sec,date,head,mode,amount
+# Fee receipts already issued, so the collection register and the dues list
+# open with the right totals. These must add up to each child's feePaid in
+# students.csv — the Fees screen shows both and a mismatch is obvious.
+R1001,RC1001,SX001,Karthik Raja M,X,A,2026-06-12,Tuition Fee,UPI,8000
+R1002,RC1002,SX001,Karthik Raja M,X,A,2026-07-24,Term Fee,Cash,4000
+R1003,RC1003,SX002,Divya Selvam,XII,A,2026-06-10,Tuition Fee,Bank Transfer,15000
+R1004,RC1004,SX002,Divya Selvam,XII,A,2026-08-06,Exam Fee,UPI,6000
+R1005,RC1005,SX003,Arun Palanisamy,XII,A,2026-06-11,Tuition Fee,UPI,15000
+R1006,RC1006,SX004,Sneha Ramanathan,XI,A,2026-06-18,Tuition Fee,Cash,10000
+R1007,RC1007,SX005,Vignesh Chinnasamy,XI,B,2026-06-22,Term Fee,Cash,4000
+R1008,RC1008,SX006,Fathima Beevi,IX,A,2026-06-09,Tuition Fee,Bank Transfer,12500
+R1009,RC1009,SX006,Fathima Beevi,IX,A,2026-07-28,Transport Fee,UPI,5000
+R1010,RC1010,SX007,Gokul Krishnan,X,A,2026-07-02,Tuition Fee,Cash,8000
+R1011,RC1011,SX009,Bharath Sundaram,VII,A,2026-06-16,Tuition Fee,UPI,6000
+R1012,RC1012,SX009,Bharath Sundaram,VII,A,2026-08-11,Transport Fee,Cash,3000
+R1013,RC1013,SX010,Anitha Duraisamy,V,A,2026-06-08,Tuition Fee,Bank Transfer,10500

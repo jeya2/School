@@ -123,6 +123,42 @@ function readJsonBody(req) {
   });
 }
 
+/* ---------- what a parent or a student may read ----------
+   A parent account exists so one family can see their own child. The
+   browser has always narrowed the roll down to that child, but narrowing
+   in the browser is a convenience and not a control: every read route
+   used to hand any signed-in account the whole school, so a parent who
+   opened the network tab could read every other child's Aadhaar,
+   address and guardian's mobile number.
+
+   Under the DPDP Act 2023 every one of those children is a child. So the
+   rule is applied here, on the server, in ONE place that all of the read
+   routes go through — a check repeated per route is a check that
+   somebody eventually forgets to add to the next one.
+
+   Collections that are wholly about other families are emptied rather
+   than narrowed: a day register is keyed by class and holds the whole
+   class, and an admission application belongs to somebody else's child.
+   `staff` and `notices` stay as they are — a staff directory and the
+   circulars are exactly what a parent is meant to see. */
+const SELF_ONLY = ['parent', 'student'];
+
+function scopeToChild(data, sid) {
+  const own = {};
+  for (const [k, v] of Object.entries(data.marks || {})) {
+    if (k.startsWith(sid + '|')) own[k] = v;
+  }
+  return {
+    ...data,
+    students:     (data.students || []).filter(s => s.id === sid),
+    receipts:     (data.receipts || []).filter(r => r.sid === sid),
+    marks:        own,
+    attHistory:   (data.attHistory || {})[sid] !== undefined ? { [sid]: data.attHistory[sid] } : {},
+    attendance:   {},
+    applications: []
+  };
+}
+
 /* ---------- API ---------- */
 async function handleApi(req, res, url) {
   if (url === '/api/health') {
@@ -174,29 +210,43 @@ async function handleApi(req, res, url) {
   const admin = user.role === 'admin';
   const denied = () => json(res, 403, { error: 'forbidden', message: 'Your role cannot do that.' });
 
+  /* A parent or student account may read exactly one child. `readable()`
+     below is the only way any route reaches the data, so this is the whole
+     of that rule. */
+  const selfOnly = SELF_ONLY.includes(user.role);
+  const readable = async () => {
+    const data = await store.exportAll();
+    return selfOnly ? scopeToChild(data, user.sid) : data;
+  };
+
   if (url === '/api/me') return json(res, 200, { user });
 
   /* Everything the portal needs to paint its first screen, in one round trip. */
   if (url === '/api/bootstrap') {
-    const data = await store.exportAll();
+    const data = await readable();
     const school = data.school || {};
     delete data.school;
     return json(res, 200, { user, school: { ...school, provisioned: !!school.name }, data });
   }
 
   if (url === '/api/data') {
-    return json(res, 200, await store.exportAll());
+    return json(res, 200, await readable());
   }
 
   if (url.startsWith('/api/collection/')) {
     const name = decodeURIComponent(url.slice('/api/collection/'.length));
     if (!store.COLLECTIONS.includes(name)) return json(res, 404, { error: 'unknown_collection', name });
 
-    if (req.method === 'GET') return json(res, 200, { name, data: await store.getCollection(name) });
+    if (req.method === 'GET') {
+      /* Scoped accounts are answered from the scoped export rather than the
+         raw collection, so one read path cannot disagree with another. */
+      const data = selfOnly ? await readable() : null;
+      return json(res, 200, { name, data: selfOnly ? data[name] : await store.getCollection(name) });
+    }
 
     if (req.method === 'PUT') {
       /* Parents and students read their own child's record; they never write. */
-      if (['parent', 'student'].includes(user.role)) return denied();
+      if (selfOnly) return denied();
       const body = await readJsonBody(req);
       if (!('data' in body)) return json(res, 400, { error: 'missing_data' });
       await store.setCollection(name, body.data);
@@ -206,10 +256,12 @@ async function handleApi(req, res, url) {
   }
 
   if (url === '/api/students' && req.method === 'GET') {
+    if (selfOnly) return json(res, 200, (await readable()).students);
     return json(res, 200, (await store.getCollection('students')) || []);
   }
   if (url.startsWith('/api/students/') && req.method === 'GET') {
     const id = decodeURIComponent(url.slice('/api/students/'.length));
+    if (selfOnly && id !== user.sid) return denied();
     const list = (await store.getCollection('students')) || [];
     const found = list.find(s => s.id === id);
     if (!found) return json(res, 404, { error: 'not_found' });

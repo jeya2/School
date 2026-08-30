@@ -1,0 +1,64 @@
+sid,term,subject,mark
+# Terms: Unit Test 1, Quarterly, Half-Yearly, Unit Test 2, Model Exam, Annual.
+# Subjects must be the ones the child's class and group actually carry —
+# see subjectsFor() in assets/js/domain.js. The Merit-cum-Means matcher
+# reads the Quarterly average, so those rows are the ones that matter.
+SX001,Quarterly,Tamil,78
+SX001,Quarterly,English,72
+SX001,Quarterly,Mathematics,81
+SX001,Quarterly,Science,76
+SX001,Quarterly,Social Science,74
+SX002,Quarterly,Tamil,72
+SX002,Quarterly,English,68
+SX002,Quarterly,Physics,70
+SX002,Quarterly,Chemistry,66
+SX002,Quarterly,Biology,74
+SX002,Quarterly,Mathematics,64
+SX003,Quarterly,Tamil,88
+SX003,Quarterly,English,82
+SX003,Quarterly,Physics,90
+SX003,Quarterly,Chemistry,86
+SX003,Quarterly,Mathematics,92
+SX003,Quarterly,Computer Science,84
+SX004,Quarterly,Tamil,74
+SX004,Quarterly,English,70
+SX004,Quarterly,Physics,72
+SX004,Quarterly,Chemistry,68
+SX004,Quarterly,Biology,75
+SX004,Quarterly,Mathematics,71
+SX005,Quarterly,Tamil,62
+SX005,Quarterly,English,58
+SX005,Quarterly,Mathematics,55
+SX005,Quarterly,Science,61
+SX005,Quarterly,Social Science,59
+SX005,Quarterly,Computer Science,64
+SX006,Quarterly,Tamil,80
+SX006,Quarterly,English,76
+SX006,Quarterly,Mathematics,74
+SX006,Quarterly,Science,78
+SX006,Quarterly,Social Science,79
+SX007,Quarterly,Tamil,66
+SX007,Quarterly,English,70
+SX007,Quarterly,Mathematics,64
+SX007,Quarterly,Science,72
+SX007,Quarterly,Social Science,68
+SX008,Quarterly,Tamil,84
+SX008,Quarterly,English,79
+SX008,Quarterly,Mathematics,88
+SX008,Quarterly,Science,82
+SX008,Quarterly,Social Science,80
+SX009,Quarterly,Tamil,71
+SX009,Quarterly,English,75
+SX009,Quarterly,Mathematics,69
+SX009,Quarterly,Science,73
+SX009,Quarterly,Social Science,70
+SX010,Quarterly,Tamil,86
+SX010,Quarterly,English,81
+SX010,Quarterly,Mathematics,90
+SX010,Quarterly,Environmental Science,85
+SX001,Unit Test 1,Tamil,74
+SX001,Unit Test 1,Mathematics,79
+SX003,Unit Test 1,Mathematics,89
+SX003,Unit Test 1,Computer Science,86
+SX006,Unit Test 1,Mathematics,71
+SX010,Unit Test 1,Mathematics,88
