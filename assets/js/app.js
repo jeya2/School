@@ -454,6 +454,8 @@ ROUTES.student = (view, p) => {
       <div class="row no-print" style="position:relative;z-index:1">
         <button class="btn btn-ghost" style="border-color:rgba(255,255,255,.4);color:#fff" onclick="tcModal('${s.id}')">📄 Certificates</button>
         <a class="btn btn-accent" href="#exams?id=${s.id}">📝 Report Card</a>
+        ${ROLE === 'admin' ? `<button class="btn btn-ghost" style="border-color:rgba(255,255,255,.4);color:#fff"
+          onclick="removeStudentModal('${s.id}')">🗑 Remove</button>` : ''}
       </div>
     </div>
 
@@ -566,6 +568,78 @@ function tcModal(id) {
           <span class="ico">${i}</span><span><b>${t}</b><small>${d}</small></span></button>`).join('')}
     </div>`,
     actions: [{ label: 'Close', fn: closeModal }]
+  });
+}
+
+/* ---------- removing a student ----------
+   A mistyped admission has to be undoable, and until now nothing in the
+   portal could take a record off the roll — the only removal was Clear
+   School Data, which takes the whole school with it.
+
+   This is a real delete, not a status change, because it exists for the
+   entry that should never have been made. A child who genuinely leaves
+   gets a Transfer Certificate and stays in the register; that is a
+   different act and the TC screen is where it belongs.
+
+   Everything keyed to the student goes with them — their attendance
+   series, their marks, their receipts and their name in any saved day
+   register — because a receipt pointing at a student id that no longer
+   exists is exactly the kind of orphan the data-quality engine would
+   later have to report. */
+function removeStudentModal(id) {
+  const s = DB.student(id);
+  if (!s) return;
+  const receipts = DB.receipts.filter(r => r.sid === id);
+  const marks = Object.keys(DB.marks).filter(k => k.startsWith(id + '|'));
+  const paid = receipts.reduce((a, r) => a + r.amount, 0);
+
+  openModal({
+    title: 'Remove this student from the roll?',
+    body: `<p><strong>${esc(s.name)}</strong> · ${esc(s.adm)} · Std ${s.cls}-${s.sec}</p>
+      <p class="small muted">Admitted ${fmtDate(s.admitted)}.</p>
+      <p>This deletes the record and everything attached to it:</p>
+      <div class="grid g2" style="margin:.8rem 0;text-align:left">
+        <div class="info-item"><span>Attendance history</span><b>${(DB.attHistory[id] || '').length} days</b></div>
+        <div class="info-item"><span>Marks</span><b>${marks.length}</b></div>
+        <div class="info-item"><span>Receipts</span><b>${receipts.length}${paid ? ' · ' + INR(paid) : ''}</b></div>
+        <div class="info-item"><span>Roll number</span><b>${s.roll}</b></div>
+      </div>
+      ${paid ? `<p class="small"><strong>${INR(paid)} of receipted fees will be removed from the collection
+        register.</strong> If this child really did pay, cancel and issue a refund entry instead.</p>` : ''}
+      <p class="small muted">This cannot be undone. Use it for an admission entered by mistake — a child who is
+      leaving should be given a Transfer Certificate instead, which keeps the record.</p>`,
+    actions: [
+      { label: 'Keep the record', cls: 'btn-ghost', fn: closeModal },
+      { label: 'Remove ' + esc(s.name.split(' ')[0]), cls: 'btn-danger', fn: async () => {
+          try {
+            DB.students = DB.students.filter(x => x.id !== id);
+            delete DB.attHistory[id];
+            DB.receipts = DB.receipts.filter(r => r.sid !== id);
+            marks.forEach(k => delete DB.marks[k]);
+
+            /* Saved day registers are keyed date|class|section and hold a
+               mark per student id, so the child has to come out of each. */
+            let registers = false;
+            for (const key of Object.keys(DB.attendance || {})) {
+              if (DB.attendance[key] && id in DB.attendance[key]) {
+                delete DB.attendance[key][id];
+                registers = true;
+              }
+            }
+
+            await DB.save('students');
+            await DB.save('attHistory');
+            if (receipts.length) await DB.save('receipts');
+            if (marks.length) await DB.save('marks');
+            if (registers) await DB.save('attendance');
+
+            AI.bust();
+            document.getElementById('modalHost').innerHTML = '';
+            toast(`${s.name} removed from the roll.`, 'ok', 4500);
+            location.hash = '#students';
+          } catch (e) { toast(e.message, 'err'); }
+        } }
+    ]
   });
 }
 
@@ -684,7 +758,15 @@ ROUTES.admission = view => {
       feePaid: 0, attPresent: 0, attTotal: 0, status: 'Active'
     };
     DB.students.push(s); DB.save('students');
-    DB.attHistory[s.id] = ''; DB.save('attHistory');
+    /* One character per working day, or this record does not line up with
+       attDays and the importer refuses the WHOLE school on restore — which
+       made "Full backup" produce a file that could not be loaded back the
+       moment anybody was admitted. 'P' is the fill the roll-call screen
+       already uses when it pads a short series (see padEnd in
+       ROUTES.attendance): a child cannot be marked absent for days before
+       they were on the roll. attPresent/attTotal stay at 0, because
+       nothing has actually been registered for them yet. */
+    DB.attHistory[s.id] = 'P'.repeat(DB.attDays.length); DB.save('attHistory');
     AI.bust();
     toast(`Admission ${s.adm} created for ${s.name}.`, 'ok', 4500);
     openModal({

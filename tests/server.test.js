@@ -135,6 +135,35 @@ function cleanup() {
   ok('the anchor student survived the round trip',
     boot.data.data.students.some(s => s.id === 'S4102' && s.name === 'Karthik Raja'));
 
+  /* ══════════════ a backup can actually be restored ══════════════
+     "Full backup" writes whatever the deployment holds, and the importer
+     refuses an attHistory string that is not one character per working
+     day. So the two have to agree, or the backup is a file that cannot be
+     loaded back — which is the worst kind of backup, because it looks
+     like it worked. Admitting a student used to seed an empty series and
+     break exactly this. */
+  section('an export can be re-imported');
+  const live = boot.data.data;
+  ok('every child has one attendance character per working day',
+    Object.entries(live.attHistory).every(([, h]) => h.length === live.attDays.length),
+    `attDays=${live.attDays.length}`);
+
+  const roundTrip = await call(admin, 'POST', '/api/provision/validate',
+    { school: boot.data.school, ...live });
+  ok('the current deployment validates as a re-importable file', roundTrip.data.ok === true,
+    (roundTrip.data.errors || []).join(' | '));
+
+  /* And the guard itself still bites: a short series must be refused, or
+     the assertion above would pass for the wrong reason. */
+  const shortSeries = await call(admin, 'POST', '/api/provision/validate', {
+    school: { name: 'X' },
+    students: [{ id: 'A', name: 'A', cls: 'X' }],
+    attDays: ['2026-06-01', '2026-06-02'],
+    attHistory: { A: '' }
+  });
+  ok('an empty attendance series is still refused',
+    shortSeries.data.ok === false && shortSeries.data.errors.some(e => /does not match attDays/i.test(e)));
+
   const badFile = await call(admin, 'POST', '/api/provision/validate', {
     school: { short: 'No name' },
     students: [{ id: 'A', name: 'X', cls: 'X' }, { id: 'A', name: 'Y', cls: 'ZZZ' }]

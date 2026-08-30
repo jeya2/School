@@ -96,7 +96,13 @@ function applyTheme(t) {
   Store.set('theme', t);
   document.querySelectorAll('#themeBtn').forEach(b => b.textContent = t === 'dark' ? '☀️' : '🌙');
 }
-applyTheme(Store.get('theme', 'light'));
+/* Dark is the default. Anyone who has already chosen keeps their choice —
+   this is only the fallback for a browser with nothing stored, so the
+   toggle still wins and still persists. The same value is hardcoded on
+   <html data-theme> in app.html and index.html, which is what stops a
+   flash of the light theme before this file runs; change one and change
+   all three. */
+applyTheme(Store.get('theme', 'dark'));
 document.addEventListener('click', e => {
   const b = e.target.closest('#themeBtn');
   if (!b) return;
