@@ -182,6 +182,52 @@ function cleanup() {
   ok('a parent may not edit the school profile',
     (await call(parent, 'PUT', '/api/school', { name: 'Mine now' })).status === 403);
 
+  /* ══════════════ a parent reads ONE child ══════════════
+     Refusing the write was only ever half the rule. The browser narrows
+     the roll to the family's own child, but the browser is a
+     convenience: every read route has to narrow it too, or a parent who
+     opens the network tab reads every other child's Aadhaar, address and
+     guardian's mobile number. Every read path is asserted separately —
+     one of them being scoped is not the same as all of them being. */
+  section('a parent reads one child and no more');
+  const staffRoll = (await call(admin, 'GET', '/api/bootstrap')).data.data.students;
+  ok('the school has a roll worth protecting', staffRoll.length > 1, `${staffRoll.length} students`);
+
+  const pBoot = await call(parent, 'GET', '/api/bootstrap');
+  ok('a parent may read', pBoot.status === 200);
+  ok('bootstrap carries only their child',
+    pBoot.data.data.students.length === 1 && pBoot.data.data.students[0].id === 'S4102',
+    `${pBoot.data.data.students.length} of ${staffRoll.length}`);
+  ok('no other child appears anywhere in the payload',
+    !JSON.stringify(pBoot.data).includes(staffRoll.find(s => s.id !== 'S4102').id));
+
+  const pData = await call(parent, 'GET', '/api/data');
+  ok('/api/data is scoped too', pData.data.students.length === 1);
+  const pColl = await call(parent, 'GET', '/api/collection/students');
+  ok('/api/collection/students is scoped too', pColl.data.data.length === 1);
+  const pList = await call(parent, 'GET', '/api/students');
+  ok('/api/students is scoped too', pList.data.length === 1);
+
+  const someoneElse = staffRoll.find(s => s.id !== 'S4102').id;
+  ok('a parent may read their own child by id',
+    (await call(parent, 'GET', '/api/students/S4102')).status === 200);
+  ok('a parent may not read another child by id',
+    (await call(parent, 'GET', `/api/students/${someoneElse}`)).status === 403);
+
+  ok('marks are narrowed to their child',
+    Object.keys(pBoot.data.data.marks).every(k => k.startsWith('S4102|')));
+  ok('receipts are narrowed to their child',
+    (pBoot.data.data.receipts || []).every(r => r.sid === 'S4102'));
+  ok('the attendance history holds one child',
+    Object.keys(pBoot.data.data.attHistory).every(k => k === 'S4102'));
+  ok('class day-registers are withheld entirely',
+    Object.keys(pBoot.data.data.attendance || {}).length === 0);
+  ok('other families\' admission applications are withheld',
+    (pBoot.data.data.applications || []).length === 0);
+
+  ok('a teacher still sees the whole roll',
+    (await call(teacher, 'GET', '/api/bootstrap')).data.data.students.length === staffRoll.length);
+
   /* ══════════════ passwords ══════════════ */
   section('passwords');
   ok('a short password is refused', (await call(admin, 'POST', '/api/users',

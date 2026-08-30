@@ -1,0 +1,21 @@
+id,adm,emis,name,gender,cls,sec,roll,group,medium,dob,community,religion,blood,aadhaar,father,fatherOcc,mother,phone,address,admitted,rte,transport,hostel,feeTotal,feePaid,income,firstGraduate,cwsn,status
+# The roll. id, name and cls are required and every id must be unique.
+# cls is a Roman numeral I–XII · community is OC/BC/BCM/MBC/SC/ST · medium is Tamil or English.
+# group applies to Std XI–XII only: Bio-Maths, Pure Science, Computer Science, Commerce, Vocational.
+# income, firstGraduate, cwsn, community, religion and transport are what the scholarship
+# matcher reads. Leave one out and the child simply will not match the schemes that need it.
+# attPresent and attTotal are NOT here on purpose — build.js counts them from attendance.csv,
+# so the aggregate and the day-by-day register can never disagree about the same child.
+#
+# Six records below carry DELIBERATE defects, at realistic rates, so the data-quality
+# engine has true faults to find on a trial. They are listed in README.md. Do not "fix" them.
+SX001,SX4001,3305100001,Karthik Raja M,Male,X,A,1,,Tamil,2011-03-12,MBC,Hindu,O+,482913756240,Murugesan,Weaver,Amutha,9843045671,"42, Perundurai Road, Erode",2017-06-01,false,Route 2 · Thindal,false,17500,12000,96000,true,false,Active
+SX002,SX4002,3305100002,Divya Selvam,Female,XII,A,1,Bio-Maths,English,2009-01-30,SC,Hindu,B+,561239874102,Selvam,Daily Wage,Vasanthi,9843045672,"18, Anna Nagar, Erode",2015-06-02,false,Route 1 · Chithode,false,21000,21000,72000,true,false,Active
+SX003,SX4003,3305100003,Arun Palanisamy,Male,XII,A,2,Computer Science,English,2009-05-14,BC,Hindu,A+,739451028366,Palanisamy,Business,Rajeswari,9843045673,"7, Surampatti Main Road, Erode",2015-06-02,false,,false,21000,15000,180000,false,false,Active
+SX004,SX4004,3305100004,Sneha Ramanathan,Female,XI,A,1,Pure Science,Tamil,2010-06-25,MBC,Hindu,O-,914728365014,Ramanathan,Farmer,Kalaiselvi,9843045674,"96, Veerappanchatram, Erode",2016-06-06,false,Route 3 · Surampatti,false,21000,10000,150000,true,false,Active
+SX005,SX4005,3305100005,Vignesh Chinnasamy,Male,XI,B,1,,Tamil,2010-09-03,ST,Hindu,B-,206483917552,Chinnasamy,Daily Wage,Poongodi,9843045675,"12, Kasipalayam, Erode",2016-06-06,false,,false,21000,4000,88000,true,false,Active
+SX006,SX4006,3305100006,Fathima Beevi,Female,IX,A,1,,English,2012-02-19,BCM,Muslim,AB+,657390214887,Abdul Rahman,Shopkeeper,Nasreen Banu,9843045676,"31, Karungalpalayam, Erode",2018-06-04,false,Route 2 · Thindal,false,17500,17500,84000,false,false,Active
+SX007,SX4007,3305100007,Gokul Krishnan,Male,X,A,2,,Tamil,2011-07-19,SC,Hindu,O+,348270196453,Krishnan,Driver,Chitra,9843045677,,2017-06-01,false,,false,17500,8000,110000,false,true,Active
+SX008,SX4008,3305100008,Meena Velmurugan,Female,VIII,A,1,,Tamil,2013-07-08,MBC,Hindu,A-,825014739661,Velmurugan,Textile Worker,Saroja,9843045678,"58, Solar Nagar, Erode",2019-06-10,true,,false,14000,0,0,false,false,Active
+SX009,SX4009,3305100003,Bharath Sundaram,Male,VII,A,1,,Tamil,2014-05-20,BC,Christian,B+,470926183375,Sundaram,Government Service,Mallika,9843045679,"23, Periyar Nagar, Erode",2020-06-08,false,Route 1 · Chithode,false,14000,9000,95000,false,false,Active
+SX010,SX4010,3305100010,Anitha Duraisamy,Female,V,A,1,,Tamil,2016-04-12,OC,Hindu,A+,,Duraisamy,Teacher,Latha,98430,"64, Nasiyanur Road, Erode",2022-06-06,false,,false,10500,10500,260000,false,false,Active

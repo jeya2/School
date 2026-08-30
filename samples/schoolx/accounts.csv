@@ -1,0 +1,19 @@
+username,password,name,title,role,sid
+# Sign-ins created at import. Existing usernames are LEFT ALONE, so re-importing
+# never resets a password someone has already changed. Passwords are hashed with
+# scrypt on arrival; the plaintext is not stored anywhere.
+#
+# Roles: admin, principal, teacher, accountant, parent, student.
+# Give parent and student accounts a sid — that is the one child they may read.
+# Parents and students never see the intelligence screens; the API enforces it.
+#
+# THESE ARE TRIAL PASSWORDS IN A FILE THAT IS IN GIT. Rotate every one of them
+# on the Users screen before this URL goes to anybody outside the project.
+admin,SchoolX-Office-2026,R. Saravanan,Office Superintendent,admin,
+principal,SchoolX-Head-2026,L. Priyadharshini,Principal,principal,
+kavitha,SchoolX-Teach-2026,M. Kavitha,Class Teacher · X-A,teacher,
+ravichandran,SchoolX-Teach-2026,S. Ravichandran,Class Teacher · XII-A,teacher,
+elangovan,SchoolX-Teach-2026,K. Elangovan,Class Teacher · XI-A,teacher,
+accounts,SchoolX-Fees-2026,P. Elangovan,Accountant,accountant,
+parentsx001,SchoolX-Parent-2026,Murugesan,Parent of Karthik Raja M,parent,SX001
+stusx001,SchoolX-Student-2026,Karthik Raja M,Std X-A · Roll 1,student,SX001

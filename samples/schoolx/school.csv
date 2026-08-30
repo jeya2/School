@@ -1,0 +1,18 @@
+key,value
+# The school's identity and calendar. name is required; everything else is optional.
+# yearStart, yearWorkingDays and minAttendance drive the 75% eligibility forecast.
+# holidays is a semicolon-separated list of YYYY-MM-DD dates.
+name,School X
+short,School X
+tamil,ஸ்கூல் எக்ஸ்
+addr,"142, Perundurai Road, Erode – 638 011, Tamil Nadu"
+phone,0424 – 2260 145
+email,office@schoolx.edu.in
+code,33051
+udise,33071200812
+year,2026–27
+est,1998
+yearStart,2026-06-01
+yearWorkingDays,220
+minAttendance,0.75
+holidays,2026-06-15;2026-07-17;2026-07-31;2026-08-15

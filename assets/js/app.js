@@ -272,7 +272,17 @@ ROUTES.dashboard = view => {
 /* ═══════════════════════════ MY CHILD (parent / student) ═══════════════════════════ */
 ROUTES.mychild = view => {
   setHead(ROLE === 'parent' ? 'My Child' : 'My Record', SCHOOL.name);
-  const s = DB.student('S4102') || DB.students[0];
+  /* The account's own child. USER.sid is the link between a sign-in and a
+     record; the fallback is only for a malformed account with no sid, and
+     is safe because the server sends a parent or student exactly one
+     student. This used to name a student id from the sample school, which
+     showed the wrong child to every family on any other school's roll. */
+  const s = DB.student(USER && USER.sid) || DB.students[0];
+  if (!s) {
+    view.innerHTML = `<div class="empty"><h3>No record linked to this account</h3>
+      <p>This sign-in is not attached to a student. Ask the school office to link it.</p></div>`;
+    return;
+  }
   const a = pct(s.attPresent, s.attTotal);
   const subs = subjectsFor(s.cls, s.group);
   const term = 'Quarterly';
